@@ -10,7 +10,9 @@
   };
 
   const params = new URLSearchParams(location.search);
-  // ?nov6 exercises the v4-only network state while the data is still static.
+  // ?nov4 / ?nov6 exercise a single-stack network while the data is still
+  // static. Both together previews a machine that answered for neither family.
+  if (params.has("nov4")) DATA.v4 = null;
   if (params.has("nov6")) DATA.v6 = null;
 
   /* ---------- scramble ---------- */
@@ -304,7 +306,60 @@
     });
   }
 
+  // `aria-disabled`, not the `disabled` attribute: a truly disabled button
+  // drops out of the tab order and goes silent, so a screen reader user
+  // sweeping the page finds nothing where the control was and can't tell
+  // whether the page has a version switch at all. This way it stays reachable
+  // and announces itself — as unavailable. selectVersion() already refuses the
+  // click, so the attribute is describing a rule that's enforced elsewhere.
+  function setToggleEnabled(enabled) {
+    toggleEl.classList.toggle("is-disabled", !enabled);
+    toggleBtns.forEach((btn) => btn.setAttribute("aria-disabled", String(!enabled)));
+  }
+
   const STATIC = { duration: 0, hold: 0, charDuration: 0 };
+
+  // Which family is missing decides the copy. A v6-only network is a real
+  // place to be — mobile carriers, v6-only hosting — and telling someone
+  // standing on one that they have "no IPv6" is worse than saying nothing.
+  // Each side borrows its own family's unspecified address, which is that
+  // family's own word for "no address" and keeps the slot honest without
+  // inventing a sentence to put in it.
+  // The slot says it in words rather than borrowing the family's unspecified
+  // address. `::` and `0.0.0.0` are exact, but they're exact for people who
+  // already know IPv6 — and those are precisely the people who never needed
+  // this page. To everyone else two colons at 128px read as a failed render,
+  // and `0.0.0.0` reads worse still: like a real answer they could repeat to
+  // someone. The largest thing on screen should say what the screen reader
+  // already says.
+  const EMPTY = {
+    v4: { word: "no IPv4", label: "No IPv4 address on this network", title: "no ipv4", other: "v6" },
+    v6: { word: "no IPv6", label: "No IPv6 address on this network", title: "no ipv6", other: "v4" },
+  };
+
+  // The word above already carries "no IPv6", so the line underneath spends
+  // itself on what the word can't say: why, and why clicking does nothing.
+  // The "v4-only" half is a claim about the *other* family, so it's composed
+  // from that family's data rather than baked into a string — hardcoded, it
+  // silently became a lie when both came back empty, with each tab claiming
+  // the other one worked.
+  function emptyMeta(empty) {
+    const cause = DATA[empty.other] ? `${empty.other}-only network` : "no address either way";
+    return `${cause} · nothing to copy`;
+  }
+
+  // The empty state can't go through scramble(): those cells are a digit grid
+  // pinned to `width: 1ch`, which stacks letters on top of each other. One
+  // span that opts out of the grid — but still a `.cell`, so it inherits the
+  // dimming the failure and empty states share.
+  function setWord(el, text) {
+    cancelAnimationFrame(el._scrambleRAF);
+    const span = document.createElement("span");
+    span.className = "cell word";
+    span.style.setProperty("--i", 0);
+    span.textContent = text;
+    el.replaceChildren(span);
+  }
 
   function render(version, { animate = true, fast = false } = {}) {
     const entry = DATA[version];
@@ -316,22 +371,25 @@
     if (entry) ipBtn.title = COPY_HINT;
     else ipBtn.removeAttribute("title");
     setToggle(version);
+    // An empty family is still worth switching away from, so the control only
+    // dies on a failed lookup — and comes back if a retry ever succeeds.
+    setToggleEnabled(true);
 
     if (!entry) {
-      // A missing IPv6 is not a failure — we know the answer, and the answer
-      // is that there isn't one. So it stays still rather than churning like
-      // renderFailure does: perpetual motion would claim we're still looking.
-      // `::` is the address family's own word for "no address", which lets the
-      // slot stay honest without inventing a sentence to put in it. Sized as
-      // v4 so it reads as a statement instead of shrinking into the corner.
+      // A missing address is not a failure — we know the answer, and the
+      // answer is that there isn't one. So it stays still rather than churning
+      // like renderFailure does: perpetual motion would claim we're still
+      // looking. Sized as v4 either way: v6's smaller type exists to fit 39
+      // characters, and a seven-character word doesn't need it.
+      const empty = EMPTY[version];
       state.copyable = false;
       ipBtn.dataset.version = "v4";
       ipBtn.classList.add("is-empty");
-      ipLabel.textContent = "No IPv6 address on this network";
-      setMeta("no ipv6 · v4-only network");
-      document.title = "no ipv6";
-      scramble(ipText, "::", STATIC);
-      if (fast) announce("No IPv6 address on this network");
+      ipLabel.textContent = empty.label;
+      setMeta(emptyMeta(empty));
+      document.title = empty.title;
+      setWord(ipText, empty.word);
+      if (fast) announce(empty.label);
       return;
     }
 
@@ -362,6 +420,7 @@
     ipBtn.removeAttribute("title");
     ipBtn.dataset.version = "v4";
     ipLabel.textContent = "IP address unavailable";
+    setToggleEnabled(false);
     setMeta("no route · can't see you from here");
     document.title = BASE_TITLE;
     // The digits never lock in. The page is honest about not knowing.
@@ -435,6 +494,10 @@
   if (params.has("fail")) {
     renderFailure();
   } else {
-    render("v4");
+    // Real traffic always lands on v4. A ?noXX flag boots onto the family it
+    // removed instead — the empty state is the whole reason you passed the
+    // flag, and making you click the toggle to reach it just hides it.
+    const missing = ["v4", "v6"].find((v) => !DATA[v]);
+    render(missing ?? "v4");
   }
 })();

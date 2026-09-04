@@ -200,6 +200,16 @@ button { font: inherit; color: inherit; }
   transition-delay: 0s;
 }
 
+/* The empty state puts a word in the slot instead of an address. 1ch is the
+   advance of "0" — right for digits, but it stacks "no IPv6" into a smear —
+   so the word opts out of the column grid and keeps natural advances. Still a
+   `.cell`, so the dimming that marks a dead slot still finds it. */
+.cell.word {
+  width: auto;
+  letter-spacing: 0.02em;
+  transition-delay: 0s;
+}
+
 /* In-flight glyphs sit back; locking in "ignites" them over 120ms. */
 .cell.is-scrambling {
   color: var(--fg-muted);
@@ -349,6 +359,20 @@ button { font: inherit; color: inherit; }
 .toggle-btn:hover:not(.is-active) { color: var(--fg-secondary); }
 
 .toggle-btn.is-active { color: var(--bg); }
+
+/* Failed lookup: there's no second answer to switch to. Marked with
+   `aria-disabled` rather than `disabled` (see setToggleEnabled), so it keeps
+   its focus ring and its place in the tab order — which means it also has to
+   *look* unavailable, or it's a control that reads live and does nothing.
+   0.45 is the same dimming the value above uses; one opacity across the page
+   for "we don't have this". */
+.toggle.is-disabled { opacity: 0.45; }
+
+/* Every affordance that says "this responds to you" has to go with it: the
+   pointer, the hover lift, and the press-squish on the thumb. */
+.toggle.is-disabled .toggle-btn { cursor: default; }
+.toggle.is-disabled .toggle-btn:hover:not(.is-active) { color: var(--fg-muted); }
+.toggle.is-disabled:active .toggle-thumb { scale: 1; }
 
 /* ---- curl hint ---- */
 /* Fixed to the viewport so it costs the hero nothing. Sits at 0.45 opacity —
