@@ -13,7 +13,7 @@
 <body>
   <main class="panel">
     <section class="hero">
-      <button id="ip" class="ip-display" type="button" title="Click to copy — or press C">
+      <button id="ip" class="ip-display" type="button">
         <span id="ip-text" class="ip-text" aria-hidden="true"></span>
         <span id="ip-label" class="sr-only">Loading IP address</span>
       </button>
@@ -26,8 +26,18 @@
 
       <!-- Below the control, not above it: this slot is empty at rest, and a
            reserved blank row between the IP and its toggle just pushed the two
-           apart. As a status line it also belongs after the thing it reports on. -->
-      <p id="meta" class="meta"><span id="meta-text" class="meta-text"></span></p>
+           apart. As a status line it also belongs after the thing it reports on.
+
+           The hint replaces the native `title` tooltip the IP used to carry: it
+           lands in a row the layout already reserves, appears the moment the
+           pointer arrives instead of a second later, and is the same voice as
+           the "copied to clipboard" it precedes. Absolutely positioned so it
+           can never push the status text off centre; aria-hidden because the
+           button's own label already says "Copy IP address …". -->
+      <p id="meta" class="meta">
+        <span id="meta-text" class="meta-text"></span>
+        <span class="copy-hint" aria-hidden="true">click to copy · or press C</span>
+      </p>
     </section>
 
     <p id="status" class="sr-only" role="status" aria-atomic="true"></p>

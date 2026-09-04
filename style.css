@@ -155,11 +155,66 @@ button { font: inherit; color: inherit; }
   transition: transform 160ms var(--ease);
 }
 
-/* Press acknowledgement — lands before the clipboard write resolves. */
-.ip-display:active { transform: scale(0.97); }
+/* Press acknowledgement — lands before the clipboard write resolves. A 3%
+   squish reads as a tap on a 13px button and as a lurch on a 128px one, so the
+   hero gets a smaller number than the curl hint below it. */
+.ip-display[data-copyable]:active { transform: scale(0.985); }
 
+/* ---- affordance: hover and keyboard focus ---- */
+/* One switch, --affordance, flipped on .hero so the three signals below stay
+   in sync and each gets to declare its own transition. It's set on the
+   *container* because one of the three lives in the meta row, which is a
+   sibling of the button being hovered — custom properties only travel down.
+   Unregistered, so the flip itself is discrete: the animation comes from the
+   transitions on the properties that read it, which is exactly what we want.
+   `[data-copyable]` is the whole gate. `no IPv4` is not a button, and a slot
+   with nothing in it must not light up, promise a rail, or offer to copy. */
 @media (hover: hover) and (pointer: fine) {
-  .ip-display:hover .cell:not(.is-scrambling) { color: var(--accent-deep); }
+  .hero:has(.ip-display[data-copyable]:hover) { --affordance: 1; }
+}
+.hero:has(.ip-display[data-copyable]:focus-visible) { --affordance: 1; }
+
+/* 1. The separators light up. Deliberately not the digits: the copy
+   confirmation is a full accent wash across every glyph, and if hover already
+   spent that colour the confirmation has nowhere left to go. Tinting only the
+   dots and colons keeps hover a quieter note in the same key — the wiring
+   glowing rather than the whole sign switching on. */
+.ip-display[data-copyable] .cell.sep {
+  color: color-mix(
+    in oklch,
+    var(--fg),
+    var(--accent-deep) calc(var(--affordance, 0) * 100%)
+  );
+}
+
+/* 2. A rail draws itself under the value, out from the centre. Anchored and
+   sized in `em` so it sits the same optical distance below 128px IPv4 digits
+   and 28px IPv6 ones, and stretched from 0.35 rather than 0 so it reads as a
+   line extending rather than a dash popping into existence.
+   The ends dissolve instead of stopping. A hard-edged rule the exact width of
+   the value drew a second rectangle under the first and made the number look
+   underlined, like a link; fading the last 10% leaves light under the digits
+   with no box around them. The gradient scales with the sweep, so the fade
+   stays proportional the whole way out. */
+.ip-text::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% - 0.16em);
+  height: max(1.5px, 0.019em);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent-deep) 10%,
+    var(--accent-deep) 90%,
+    transparent
+  );
+  opacity: var(--affordance, 0);
+  scale: calc(0.35 + 0.65 * var(--affordance, 0)) 1;
+  transition:
+    opacity 200ms var(--ease),
+    scale 420ms var(--ease-expo);
 }
 
 /* ---- version switch ---- */
@@ -172,6 +227,7 @@ button { font: inherit; color: inherit; }
    defocus on a 128px IPv4 and a 13px IPv6. */
 .ip-text {
   display: inline-flex;
+  position: relative; /* containing block for the hover rail */
   transition:
     opacity 220ms var(--ease-expo),
     transform 220ms var(--ease-expo),
@@ -259,6 +315,11 @@ button { font: inherit; color: inherit; }
   /* min-height still reserves the row even though it's usually empty: the
      panel is vertically centred, so a message appearing would otherwise
      shunt the IP upward as it arrives. */
+  position: relative; /* the hover hint stacks on the row, not in it */
+  /* The row is the hero's full width rather than its own content's — it is
+     usually empty, and an out-of-flow hint pinned to a zero-width box has
+     nowhere to go but down, one word per line. */
+  align-self: stretch;
   margin: 20px 0 0;
   min-height: 1.2em;
   font-size: clamp(11px, 1.6vw, 13px);
@@ -285,6 +346,39 @@ button { font: inherit; color: inherit; }
   transform: translateY(2px);
   transition-duration: var(--ip-exit);
   transition-timing-function: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* 3. The row says what a click does. Out of flow and pinned across the row, so
+   the width of a sentence that is usually invisible can never nudge the status
+   text off centre. `[data-copyable]` guarantees the row is empty whenever this
+   can appear, so the two never collide.
+
+   The delay is only on the way in — computed from --affordance, so the flip to
+   1 picks up 220ms of patience and the flip back to 0 picks up none. A pointer
+   crossing the hero on its way somewhere else leaves without ever having been
+   offered anything; a pointer that stops gets told. Leaving instantly matters
+   just as much: the hint has to be gone before the click that dismissed it
+   lands, or it reads as an answer to the click. */
+.copy-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: var(--affordance, 0);
+  translate: 0 calc((1 - var(--affordance, 0)) * 3px);
+  transition:
+    opacity 200ms var(--ease),
+    translate 320ms var(--ease-expo);
+  transition-delay: calc(var(--affordance, 0) * 220ms);
+}
+
+/* The slot is busy confirming a copy — and a hint on how to do the thing that
+   was just done is the one moment it's noise. */
+.meta[data-copied] .copy-hint {
+  opacity: 0;
+  transition-delay: 0s;
 }
 
 /* ---- version toggle ---- */
@@ -459,7 +553,19 @@ button { font: inherit; color: inherit; }
   .toggle-btn {
     transition-duration: 0.01ms;
   }
-  .ip-display:active { transform: none; }
+  .ip-display[data-copyable]:active { transform: none; }
+  /* The affordance is a fade, not a sweep: the rail arrives at full width and
+     the hint doesn't rise into place. Both still appear — they're the only
+     thing telling you the number is a button. */
+  .ip-text::after {
+    scale: 1 1;
+    transition: opacity 120ms var(--ease);
+  }
+  .copy-hint {
+    translate: none;
+    transition: opacity 120ms var(--ease);
+    transition-delay: calc(var(--affordance, 0) * 220ms);
+  }
   .cell {
     transition-duration: 60ms;
     transition-delay: 0s;

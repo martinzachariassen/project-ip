@@ -137,14 +137,36 @@
   const curlLabel = document.getElementById("curl-label");
 
   const BASE_TITLE = document.title;
-  // index.html owns the wording; we only decide when it applies.
-  const COPY_HINT = ipBtn.title;
 
   // `copyable` is not the same as `!failed`: a v4-only network is a successful
   // lookup with nothing to put on the clipboard.
   const state = { version: "v4", failed: false, copyable: false, meta: "" };
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  // Mirrors state.copyable onto the DOM, because it's also the answer to "is
+  // this a button?" — and every hover, focus and press affordance in the CSS
+  // hangs off that one question.
+  function setCopyable(copyable) {
+    state.copyable = copyable;
+    if (copyable) ipBtn.dataset.copyable = "";
+    else delete ipBtn.dataset.copyable;
+  }
+
+  // A mouse click leaves focus sitting on the button it hit. The browser's
+  // :focus-visible heuristic then flips to keyboard modality on the very next
+  // keypress — so pressing C to copy drew a focus ring around whatever was
+  // last clicked, most visibly a box around the version toggle, which has
+  // nothing to do with copying. Dropping focus on pointer activation only:
+  // keyboard-driven clicks (Enter/Space) report detail 0, and they keep both
+  // their focus and their ring, which is the one case that needs it.
+  function dropPointerFocus(e) {
+    if (e.detail > 0) e.currentTarget.blur();
+  }
+
+  [ipBtn, curlBtn, ...toggleBtns].forEach((btn) =>
+    btn?.addEventListener("click", dropPointerFocus),
+  );
 
   /* ---------- screen reader announcements ---------- */
   let announceTimer;
@@ -366,10 +388,6 @@
     state.version = version;
 
     ipBtn.classList.remove("is-failed", "is-empty");
-    // A tooltip promising "click to copy" on a slot with nothing in it is
-    // worse than no tooltip, so it comes and goes with the ability.
-    if (entry) ipBtn.title = COPY_HINT;
-    else ipBtn.removeAttribute("title");
     setToggle(version);
     // An empty family is still worth switching away from, so the control only
     // dies on a failed lookup — and comes back if a retry ever succeeds.
@@ -382,7 +400,7 @@
       // looking. Sized as v4 either way: v6's smaller type exists to fit 39
       // characters, and a seven-character word doesn't need it.
       const empty = EMPTY[version];
-      state.copyable = false;
+      setCopyable(false);
       ipBtn.dataset.version = "v4";
       ipBtn.classList.add("is-empty");
       ipLabel.textContent = empty.label;
@@ -394,7 +412,7 @@
     }
 
     const { ip } = entry;
-    state.copyable = true;
+    setCopyable(true);
     ipBtn.dataset.version = version;
     // Final value goes to the accessible name immediately — never announce
     // the intermediate scramble frames.
@@ -415,9 +433,8 @@
 
   function renderFailure() {
     state.failed = true;
-    state.copyable = false;
+    setCopyable(false);
     ipBtn.classList.add("is-failed");
-    ipBtn.removeAttribute("title");
     ipBtn.dataset.version = "v4";
     ipLabel.textContent = "IP address unavailable";
     setToggleEnabled(false);
