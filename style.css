@@ -232,16 +232,55 @@ button { font: inherit; color: inherit; }
 }
 
 /* ---- version toggle ---- */
+/* Grid, not flex, and no gap: `1fr 1fr` makes both cells exactly half the
+   track, which is the assumption the sliding thumb below is built on. It also
+   means the pill can't jitter when the webfont swaps in and "IPv4"/"IPv6"
+   change width — the halves stay halves. */
 .toggle {
-  display: inline-flex;
-  gap: 2px;
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: repeat(2, 1fr);
   margin-top: 28px;
   padding: 2px;
   border: 1px solid var(--border);
   border-radius: 999px;
 }
 
+/* One pill that travels, instead of two that cross-fade — the eye tracks a
+   single object and the control reads as one mechanism.
+   Geometry: the containing block is the track's padding box (width W), so
+   `calc(50% - 2px)` == (W - 4px) / 2 == exactly one cell, and `translate: 100%`
+   moves it by its own width — landing perfectly on the second cell at any
+   track size, with no measuring in JS. */
+.toggle-thumb {
+  position: absolute;
+  z-index: 0;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc(50% - 2px);
+  border-radius: 999px;
+  background: var(--fg);
+  translate: 0;
+  /* Separate `translate`/`scale` properties, not `transform`, so the travel
+     and the press-squish can carry different durations without fighting over
+     one property. Expo is front-loaded: ~90% of the distance is covered in the
+     first 100ms, so it reads as instant but still lands softly. */
+  transition:
+    translate 340ms var(--ease-expo),
+    scale 200ms var(--ease-expo),
+    background-color 0.2s var(--ease);
+}
+
+.toggle[data-version="v6"] .toggle-thumb { translate: 100%; }
+
+/* Physical key feel: press anywhere on the track and the pill gives, then
+   springs back as it launches into the slide. */
+.toggle:active .toggle-thumb { scale: 0.93; }
+
 .toggle-btn {
+  position: relative; /* above the thumb */
+  z-index: 1;
   appearance: none;
   border: none;
   background: none;
@@ -252,17 +291,16 @@ button { font: inherit; color: inherit; }
   font-weight: 400;
   letter-spacing: 0.1em;
   color: var(--fg-muted);
-  transition:
-    color 0.18s var(--ease),
-    background-color 0.18s var(--ease);
+  /* Roughly half the slide: the label has to hand off its light-on-dark
+     colour at the moment the pill actually passes under it. Slower and the
+     incoming label flashes light-on-light; faster and the outgoing one goes
+     muted while still sitting on the dark pill. */
+  transition: color 160ms var(--ease);
 }
 
 .toggle-btn:hover:not(.is-active) { color: var(--fg-secondary); }
 
-.toggle-btn.is-active {
-  color: var(--bg);
-  background: var(--fg);
-}
+.toggle-btn.is-active { color: var(--bg); }
 
 /* ---- reduced motion ---- */
 /* Gentler, not zero: the colour swap carries the meaning, so it stays.
@@ -288,6 +326,10 @@ button { font: inherit; color: inherit; }
     transform: none;
     filter: none;
   }
+  /* The pill jumps to the new cell instead of travelling; it keeps the theme
+     crossfade, which is colour, not motion. */
+  .toggle-thumb { transition: background-color 0.2s var(--ease); }
+  .toggle:active .toggle-thumb { scale: 1; }
 }
 
 /* ---- utilities ---- */

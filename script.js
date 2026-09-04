@@ -128,6 +128,7 @@
   const ipLabel = document.getElementById("ip-label");
   const metaEl = document.getElementById("meta");
   const statusEl = document.getElementById("status");
+  const toggleEl = document.querySelector(".toggle");
   const toggleBtns = [...document.querySelectorAll(".toggle-btn")];
 
   const state = { version: "v4", failed: false };
@@ -202,6 +203,8 @@
   };
 
   function setToggle(version) {
+    // Drives the sliding pill in CSS.
+    toggleEl.dataset.version = version;
     toggleBtns.forEach((btn) => {
       const active = btn.dataset.version === version;
       btn.classList.toggle("is-active", active);
