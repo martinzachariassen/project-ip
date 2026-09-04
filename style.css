@@ -112,23 +112,31 @@ button { font: inherit; color: inherit; }
 .hero { text-align: center; }
 
 .ip-display {
-  /* min-height is pinned to the IPv4 size so switching to the smaller IPv6
-     type doesn't collapse the hero and jump the page. */
+  /* The box is a fixed slot sized to the IPv4 type, padding included (see
+     --ip-pad). The IPv6 type is smaller and just centres inside it, so
+     switching versions can't change the hero's height — nothing on the page
+     moves. `height`, not `min-height`: min-height excluded the padding, which
+     left v4 8px taller than v6 and shifted the whole centred layout. */
+  --ip-pad: 4px;
+  --ip-slot: clamp(1.6rem, 9vw, 8rem);
+  /* Read back by script.js — style.css stays the single source of truth for
+     how long the outgoing value takes to leave. */
+  --ip-exit: 110ms;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: clamp(1.6rem, 9vw, 8rem);
+  height: calc(var(--ip-slot) + 2 * var(--ip-pad));
   background: none;
   border: none;
   cursor: pointer;
   font-family: "Rajdhani", var(--font-mono);
   font-weight: 700;
-  font-size: clamp(1.6rem, 9vw, 8rem);
+  font-size: var(--ip-slot);
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
   color: var(--fg);
-  padding: 4px 8px;
+  padding: var(--ip-pad) 8px;
   border-radius: 4px;
   line-height: 1;
   white-space: nowrap;
@@ -142,7 +150,29 @@ button { font: inherit; color: inherit; }
   .ip-display:hover .cell:not(.is-scrambling) { color: var(--accent-deep); }
 }
 
-.ip-text { display: inline-flex; }
+/* ---- version switch ---- */
+/* A focus pull, not a slide: the old value defocuses and drops away, the new
+   one sharpens back in while the scramble churns. The font-size change between
+   v4 and v6 happens at opacity 0, so it's never seen as a snap.
+   Base rule = the entrance (expo, settles early). .is-switching = the exit
+   (short, accelerating — it should feel like it's leaving, not easing out).
+   Blur is in `em` so it tracks the type size: the same optical amount of
+   defocus on a 128px IPv4 and a 13px IPv6. */
+.ip-text {
+  display: inline-flex;
+  transition:
+    opacity 220ms var(--ease-expo),
+    transform 220ms var(--ease-expo),
+    filter 220ms var(--ease-expo);
+}
+
+.ip-display.is-switching .ip-text {
+  opacity: 0;
+  transform: scale(0.96);
+  filter: blur(0.05em);
+  transition-duration: var(--ip-exit);
+  transition-timing-function: cubic-bezier(0.4, 0, 1, 1);
+}
 
 /* 1ch == advance width of "0", so digits are pinned to a fixed column
    whether or not Rajdhani actually ships the `tnum` feature. */
@@ -185,7 +215,8 @@ button { font: inherit; color: inherit; }
 }
 .ip-display.is-failed .cell { opacity: 0.45; }
 
-/* IPv6 is 39 chars vs IPv4's 15 — needs its own scale or it overflows. */
+/* IPv6 is 39 chars vs IPv4's 15 — needs its own scale or it overflows.
+   Only the type shrinks; the slot height stays pinned to --ip-slot. */
 .ip-display[data-version="v6"] {
   font-size: clamp(0.8rem, 3.4vw, 2.8rem);
   letter-spacing: 0.01em;
@@ -249,6 +280,13 @@ button { font: inherit; color: inherit; }
   .ip-display[data-copied] .cell {
     transition-duration: 60ms;
     transition-delay: 0s;
+  }
+  /* The crossfade still carries "this value was replaced" — only the
+     movement and the defocus go. */
+  .ip-text { transition-duration: var(--ip-exit); }
+  .ip-display.is-switching .ip-text {
+    transform: none;
+    filter: none;
   }
 }
 

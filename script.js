@@ -185,7 +185,31 @@
   });
 
   /* ---------- render ---------- */
-  function render(version, { animate = true } = {}) {
+  // IPv6 has ~3x the characters; scaling the stagger linearly would take 2.5s,
+  // so each version gets a fixed total instead.
+  // Boot is a reveal and is allowed a beat of anticipation. A toggle is a
+  // response to a click and has to feel like one — same animation, ~40%
+  // quicker, and no `hold`, because the press already was the hold.
+  const TIMING = {
+    boot: {
+      v4: { duration: 900, charDuration: 380 },
+      v6: { duration: 1200, charDuration: 260 },
+    },
+    switch: {
+      v4: { duration: 520, charDuration: 240, hold: 0 },
+      v6: { duration: 680, charDuration: 180, hold: 0 },
+    },
+  };
+
+  function setToggle(version) {
+    toggleBtns.forEach((btn) => {
+      const active = btn.dataset.version === version;
+      btn.classList.toggle("is-active", active);
+      btn.setAttribute("aria-pressed", String(active));
+    });
+  }
+
+  function render(version, { animate = true, fast = false } = {}) {
     const { ip, meta } = DATA[version];
     state.version = version;
 
@@ -196,24 +220,14 @@
     ipLabel.textContent = `Copy IP address ${ip}`;
     metaEl.textContent = meta;
 
-    toggleBtns.forEach((btn) => {
-      const active = btn.dataset.version === version;
-      btn.classList.toggle("is-active", active);
-      btn.setAttribute("aria-pressed", String(active));
-    });
+    setToggle(version);
 
     if (!animate) {
       scramble(ipText, ip, { duration: 0, hold: 0, charDuration: 0 });
       return;
     }
 
-    // IPv6 has ~3x the characters; scaling the stagger linearly would take
-    // 2.5s. Derive it from a fixed total instead.
-    const isV6 = version === "v6";
-    scramble(ipText, ip, {
-      duration: isV6 ? 1200 : 900,
-      charDuration: isV6 ? 260 : 380,
-    });
+    scramble(ipText, ip, TIMING[fast ? "switch" : "boot"][version]);
   }
 
   function renderFailure() {
@@ -228,11 +242,36 @@
   }
 
   /* ---------- toggle ---------- */
+  // The exit is CSS-driven; JS only needs to know when the value is gone.
+  const EXIT_MS =
+    parseFloat(getComputedStyle(ipBtn).getPropertyValue("--ip-exit")) || 0;
+
+  let switchToken = 0;
+
+  async function switchTo(version) {
+    const token = ++switchToken;
+
+    ipBtn.classList.add("is-switching");
+    await new Promise((resolve) => setTimeout(resolve, EXIT_MS));
+    // A newer click already owns the animation — it re-added the class and is
+    // running its own clock, so bail without touching anything.
+    if (token !== switchToken) return;
+
+    // Swapped while invisible: the v4/v6 font-size change never reads as a jump.
+    render(version, { fast: true });
+    ipBtn.classList.remove("is-switching");
+  }
+
   toggleBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
       const next = btn.dataset.version;
       if (state.failed || next === state.version) return;
-      render(next);
+
+      // The pill answers the click immediately — waiting out the exit would
+      // make the control itself feel laggy. Only the IP value animates.
+      state.version = next;
+      setToggle(next);
+      switchTo(next);
     });
   });
 
