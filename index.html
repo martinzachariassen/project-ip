@@ -5,20 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>what is my ip</title>
   <meta name="description" content="Your public IP address — clean and fast." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%23111'/><circle cx='8' cy='8' r='2.5' fill='%23a78bfa'/></svg>" />
+  <link rel="preload" as="font" type="font/woff2" href="fonts/rajdhani-700.woff2" crossorigin />
+  <link rel="preload" as="font" type="font/woff2" href="fonts/ibm-plex-mono-400.woff2" crossorigin />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="panel">
-    <section class="hero" aria-live="polite">
-      <button id="ip" class="ip-display" type="button" aria-label="Copy IP address">
-        <span id="ip-text">loading&nbsp;&hellip;</span>
+    <section class="hero">
+      <button id="ip" class="ip-display" type="button">
+        <span id="ip-text" class="ip-text" aria-hidden="true"></span>
+        <span id="ip-label" class="sr-only">Loading IP address</span>
       </button>
-      <p id="copy-toast" class="toast" role="status">copied</p>
+
+      <p id="meta" class="meta"></p>
+
+      <div class="toggle" role="group" aria-label="IP version">
+        <button type="button" class="toggle-btn is-active" data-version="v4" aria-pressed="true">IPv4</button>
+        <button type="button" class="toggle-btn" data-version="v6" aria-pressed="false">IPv6</button>
+      </div>
     </section>
+
+    <p id="status" class="sr-only" role="status" aria-atomic="true"></p>
   </main>
+
+  <noscript>
+    <p class="meta">JavaScript is required to look up your IP address.</p>
+  </noscript>
 
   <script src="script.js"></script>
 </body>
