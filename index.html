@@ -13,22 +13,34 @@
 <body>
   <main class="panel">
     <section class="hero">
-      <button id="ip" class="ip-display" type="button">
+      <button id="ip" class="ip-display" type="button" title="Click to copy — or press C">
         <span id="ip-text" class="ip-text" aria-hidden="true"></span>
         <span id="ip-label" class="sr-only">Loading IP address</span>
       </button>
-
-      <p id="meta" class="meta"></p>
 
       <div class="toggle" role="group" aria-label="IP version" data-version="v4">
         <span class="toggle-thumb" aria-hidden="true"></span>
         <button type="button" class="toggle-btn is-active" data-version="v4" aria-pressed="true">IPv4</button>
         <button type="button" class="toggle-btn" data-version="v6" aria-pressed="false">IPv6</button>
       </div>
+
+      <!-- Below the control, not above it: this slot is empty at rest, and a
+           reserved blank row between the IP and its toggle just pushed the two
+           apart. As a status line it also belongs after the thing it reports on. -->
+      <p id="meta" class="meta"><span id="meta-text" class="meta-text"></span></p>
     </section>
 
     <p id="status" class="sr-only" role="status" aria-atomic="true"></p>
   </main>
+
+  <!-- Pinned to the viewport, not appended to the panel, so it can't nudge the
+       hero off centre. Hidden on touch: no hover to reveal it, no shell to
+       paste into. -->
+  <footer class="curl">
+    <button id="curl" class="curl-btn" type="button" title="Copy the command">
+      <span id="curl-label" class="curl-label">curl ip.mlz.no</span>
+    </button>
+  </footer>
 
   <noscript>
     <p class="meta">JavaScript is required to look up your IP address.</p>

@@ -2,16 +2,16 @@
   "use strict";
 
   /* ---------- static placeholder data (dev) ---------- */
+  // No geo/ISP line. The page answers one question, and a city that GeoIP
+  // guessed wrong would only undermine the one number it got right.
   const DATA = {
-    v4: {
-      ip: "84.212.19.77",
-      meta: "Oslo · Norway · Telenor",
-    },
-    v6: {
-      ip: "2a01:79c:cebd:8e40:1c2b:9f3a:44de:1",
-      meta: "Oslo · Norway · Telenor",
-    },
+    v4: { ip: "84.212.19.77" },
+    v6: { ip: "2a01:79c:cebd:8e40:1c2b:9f3a:44de:1" },
   };
+
+  const params = new URLSearchParams(location.search);
+  // ?nov6 exercises the v4-only network state while the data is still static.
+  if (params.has("nov6")) DATA.v6 = null;
 
   /* ---------- scramble ---------- */
   const DIGITS = "0123456789";
@@ -127,11 +127,22 @@
   const ipText = document.getElementById("ip-text");
   const ipLabel = document.getElementById("ip-label");
   const metaEl = document.getElementById("meta");
+  const metaText = document.getElementById("meta-text");
   const statusEl = document.getElementById("status");
   const toggleEl = document.querySelector(".toggle");
   const toggleBtns = [...document.querySelectorAll(".toggle-btn")];
+  const curlBtn = document.getElementById("curl");
+  const curlLabel = document.getElementById("curl-label");
 
-  const state = { version: "v4", failed: false };
+  const BASE_TITLE = document.title;
+  // index.html owns the wording; we only decide when it applies.
+  const COPY_HINT = ipBtn.title;
+
+  // `copyable` is not the same as `!failed`: a v4-only network is a successful
+  // lookup with nothing to put on the clipboard.
+  const state = { version: "v4", failed: false, copyable: false, meta: "" };
+
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   /* ---------- screen reader announcements ---------- */
   let announceTimer;
@@ -143,6 +154,44 @@
     announceTimer = setTimeout(() => {
       statusEl.textContent = message;
     }, 100);
+  }
+
+  /* ---------- meta line ---------- */
+  // Empty at rest. The slot exists so the page has somewhere to speak from
+  // when it has something to say — copied, no IPv6, no route — and the
+  // reserved row height means saying it never moves the IP.
+  let metaToken = 0;
+  let metaRevertTimer;
+
+  function setMeta(text) {
+    clearTimeout(metaRevertTimer);
+    metaToken++; // any in-flight fade loses ownership of the slot
+    delete metaEl.dataset.copied;
+    state.meta = text;
+    metaText.textContent = text;
+  }
+
+  // Fades the current text out before swapping. Tokenised because a version
+  // switch or a second copy can land mid-fade, and the stale continuation
+  // must not write its text over the newer one.
+  async function fadeMetaTo(text) {
+    const token = ++metaToken;
+    metaEl.classList.add("is-swapping");
+    await wait(EXIT_MS);
+    if (token !== metaToken) return;
+    metaText.textContent = text;
+    metaEl.classList.remove("is-swapping");
+  }
+
+  // Borrow the slot for 1.5s, then hand it back to whatever belongs there.
+  function flashMeta(text) {
+    clearTimeout(metaRevertTimer);
+    metaEl.dataset.copied = "";
+    fadeMetaTo(text);
+    metaRevertTimer = setTimeout(() => {
+      delete metaEl.dataset.copied;
+      fadeMetaTo(state.meta);
+    }, 1500);
   }
 
   /* ---------- copy ---------- */
@@ -168,8 +217,8 @@
     }
   }
 
-  ipBtn.addEventListener("click", async () => {
-    if (state.failed) return;
+  async function copyIP() {
+    if (!state.copyable) return;
     const ip = DATA[state.version].ip;
 
     // Optimistic: fire the visual before awaiting the clipboard promise.
@@ -182,7 +231,50 @@
     }, 1500);
 
     const ok = await copyText(ip);
+    // The scanline says "something happened"; the word says what. Together
+    // they also teach the affordance after the fact — which is the only way
+    // touch users, who never get the hover colour, find out it's clickable.
+    flashMeta(ok ? "copied to clipboard" : "copy failed");
     announce(ok ? "IP address copied" : "Copy failed");
+  }
+
+  ipBtn.addEventListener("click", copyIP);
+
+  /* ---------- curl hint ---------- */
+  // index.html owns the command string — read it back rather than duplicating
+  // the hostname here. Captured once at boot, because the label itself gets
+  // borrowed for the confirmation and can't be the source of truth after that.
+  const CURL_CMD = curlLabel?.textContent.trim() ?? "";
+
+  let curlTimer;
+  let curlToken = 0;
+
+  // Same fade-out-swap-fade-in as the meta line, tokenised for the same
+  // reason: a second click can land mid-fade, and the stale continuation must
+  // not write the command back over a newer "copied".
+  async function swapCurlLabel(text) {
+    const token = ++curlToken;
+    curlBtn.classList.add("is-swapping");
+    await wait(EXIT_MS);
+    if (token !== curlToken) return;
+    curlLabel.textContent = text;
+    curlBtn.classList.remove("is-swapping");
+  }
+
+  curlBtn?.addEventListener("click", async () => {
+    // Optimistic, like the IP copy: the colour lands on the click, the word
+    // follows once the clipboard actually answers.
+    clearTimeout(curlTimer);
+    curlBtn.dataset.copied = "";
+
+    const ok = await copyText(CURL_CMD);
+    swapCurlLabel(ok ? "copied" : "copy failed");
+    announce(ok ? "Command copied" : "Copy failed");
+
+    curlTimer = setTimeout(() => {
+      delete curlBtn.dataset.copied;
+      swapCurlLabel(CURL_CMD);
+    }, 1500);
   });
 
   /* ---------- render ---------- */
@@ -212,21 +304,51 @@
     });
   }
 
+  const STATIC = { duration: 0, hold: 0, charDuration: 0 };
+
   function render(version, { animate = true, fast = false } = {}) {
-    const { ip, meta } = DATA[version];
+    const entry = DATA[version];
     state.version = version;
 
+    ipBtn.classList.remove("is-failed", "is-empty");
+    // A tooltip promising "click to copy" on a slot with nothing in it is
+    // worse than no tooltip, so it comes and goes with the ability.
+    if (entry) ipBtn.title = COPY_HINT;
+    else ipBtn.removeAttribute("title");
+    setToggle(version);
+
+    if (!entry) {
+      // A missing IPv6 is not a failure — we know the answer, and the answer
+      // is that there isn't one. So it stays still rather than churning like
+      // renderFailure does: perpetual motion would claim we're still looking.
+      // `::` is the address family's own word for "no address", which lets the
+      // slot stay honest without inventing a sentence to put in it. Sized as
+      // v4 so it reads as a statement instead of shrinking into the corner.
+      state.copyable = false;
+      ipBtn.dataset.version = "v4";
+      ipBtn.classList.add("is-empty");
+      ipLabel.textContent = "No IPv6 address on this network";
+      setMeta("no ipv6 · v4-only network");
+      document.title = "no ipv6";
+      scramble(ipText, "::", STATIC);
+      if (fast) announce("No IPv6 address on this network");
+      return;
+    }
+
+    const { ip } = entry;
+    state.copyable = true;
     ipBtn.dataset.version = version;
-    ipBtn.classList.remove("is-failed");
     // Final value goes to the accessible name immediately — never announce
     // the intermediate scramble frames.
     ipLabel.textContent = `Copy IP address ${ip}`;
-    metaEl.textContent = meta;
+    setMeta("");
+    // Makes a pinned tab useful: the answer is readable without switching to it.
+    document.title = ip;
 
-    setToggle(version);
+    if (fast) announce(ip);
 
     if (!animate) {
-      scramble(ipText, ip, { duration: 0, hold: 0, charDuration: 0 });
+      scramble(ipText, ip, STATIC);
       return;
     }
 
@@ -235,10 +357,13 @@
 
   function renderFailure() {
     state.failed = true;
+    state.copyable = false;
     ipBtn.classList.add("is-failed");
+    ipBtn.removeAttribute("title");
     ipBtn.dataset.version = "v4";
     ipLabel.textContent = "IP address unavailable";
-    metaEl.textContent = "no route · can't see you from here";
+    setMeta("no route · can't see you from here");
+    document.title = BASE_TITLE;
     // The digits never lock in. The page is honest about not knowing.
     scramble(ipText, "0.0.0.0", { perpetual: true });
     announce("Could not determine your IP address");
@@ -254,8 +379,12 @@
   async function switchTo(version) {
     const token = ++switchToken;
 
+    // Both leave together — sharing --ip-exit is what makes the value and its
+    // status line read as one object changing rather than two elements
+    // animating near each other.
     ipBtn.classList.add("is-switching");
-    await new Promise((resolve) => setTimeout(resolve, EXIT_MS));
+    metaEl.classList.add("is-swapping");
+    await wait(EXIT_MS);
     // A newer click already owns the animation — it re-added the class and is
     // running its own clock, so bail without touching anything.
     if (token !== switchToken) return;
@@ -263,24 +392,47 @@
     // Swapped while invisible: the v4/v6 font-size change never reads as a jump.
     render(version, { fast: true });
     ipBtn.classList.remove("is-switching");
+    metaEl.classList.remove("is-swapping");
+  }
+
+  function selectVersion(next) {
+    if (state.failed || next === state.version) return;
+
+    // The pill answers the click immediately — waiting out the exit would
+    // make the control itself feel laggy. Only the IP value animates.
+    state.version = next;
+    setToggle(next);
+    switchTo(next);
   }
 
   toggleBtns.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const next = btn.dataset.version;
-      if (state.failed || next === state.version) return;
+    btn.addEventListener("click", () => selectVersion(btn.dataset.version));
+  });
 
-      // The pill answers the click immediately — waiting out the exit would
-      // make the control itself feel laggy. Only the IP value animates.
-      state.version = next;
-      setToggle(next);
-      switchTo(next);
-    });
+  /* ---------- keyboard ---------- */
+  // Invisible until used, so it costs the layout nothing. Bare keys only —
+  // bailing on modifiers keeps Cmd/Ctrl+C working as ordinary selection copy.
+  document.addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+    const t = e.target;
+    if (t instanceof HTMLElement && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) {
+      return;
+    }
+
+    const key = e.key.toLowerCase();
+    if (key === "c") {
+      e.preventDefault();
+      copyIP();
+    } else if (key === "v") {
+      e.preventDefault();
+      selectVersion(state.version === "v4" ? "v6" : "v4");
+    }
   });
 
   /* ---------- boot ---------- */
   // ?fail exercises the failure state while the data is still static.
-  if (new URLSearchParams(location.search).has("fail")) {
+  if (params.has("fail")) {
     renderFailure();
   } else {
     render("v4");

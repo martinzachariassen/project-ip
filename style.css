@@ -55,6 +55,12 @@
 
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --ease-expo: cubic-bezier(0.19, 1, 0.22, 1);
+
+  /* How long an outgoing value takes to leave. Lives on :root because the IP
+     and the meta line exit together as one unit, and read back by script.js —
+     style.css stays the single source of truth for the timing. */
+  --ip-exit: 110ms;
+
   color-scheme: light;
 }
 
@@ -109,7 +115,16 @@ button { font: inherit; color: inherit; }
 }
 
 /* ---- hero ---- */
-.hero { text-align: center; }
+/* Column, not just centred text: the IP and the toggle are both inline-level
+   boxes, so in a plain text flow they share a line and sit side by side. Each
+   needs its own row — the toggle reads as a control *for* the value above it,
+   not as something next to it. */
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
 
 .ip-display {
   /* The box is a fixed slot sized to the IPv4 type, padding included (see
@@ -119,9 +134,6 @@ button { font: inherit; color: inherit; }
      left v4 8px taller than v6 and shifted the whole centred layout. */
   --ip-pad: 4px;
   --ip-slot: clamp(1.6rem, 9vw, 8rem);
-  /* Read back by script.js — style.css stays the single source of truth for
-     how long the outgoing value takes to leave. */
-  --ip-exit: 110ms;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -209,11 +221,17 @@ button { font: inherit; color: inherit; }
 }
 
 /* ---- failure state ---- */
-.ip-display.is-failed {
+/* Two different nothings, styled the same because they read the same:
+   `.is-failed` = we couldn't find out, `.is-empty` = we found out, and the
+   answer is that there is no address. Both are dead slots — not clickable,
+   not copyable, visibly inert. */
+.ip-display.is-failed,
+.ip-display.is-empty {
   cursor: default;
   color: var(--fg-muted);
 }
-.ip-display.is-failed .cell { opacity: 0.45; }
+.ip-display.is-failed .cell,
+.ip-display.is-empty .cell { opacity: 0.45; }
 
 /* IPv6 is 39 chars vs IPv4's 15 — needs its own scale or it overflows.
    Only the type shrinks; the slot height stays pinned to --ip-slot. */
@@ -223,12 +241,40 @@ button { font: inherit; color: inherit; }
 }
 
 /* ---- meta line ---- */
+/* The line does double duty: geo/ISP context at rest, copy confirmation on
+   demand. It's the only spare text slot on the page, so borrowing it for 1.5s
+   beats introducing a toast that has to be designed, placed and dismissed.
+   `min-height` reserves the row so neither job can shift the layout. */
 .meta {
-  margin: 18px 0 0;
+  /* min-height still reserves the row even though it's usually empty: the
+     panel is vertically centred, so a message appearing would otherwise
+     shunt the IP upward as it arrives. */
+  margin: 20px 0 0;
   min-height: 1.2em;
   font-size: clamp(11px, 1.6vw, 13px);
   letter-spacing: 0.08em;
   color: var(--fg-muted);
+  transition: color 180ms var(--ease);
+}
+
+.meta[data-copied] { color: var(--accent-deep); }
+
+/* Same exit as the IP value, one beat softer: the meta line is subordinate, so
+   it drops rather than defocuses. Sharing --ip-exit is what makes the two read
+   as a single object changing, instead of two elements animating near
+   each other. */
+.meta-text {
+  display: inline-block;
+  transition:
+    opacity 220ms var(--ease-expo),
+    transform 220ms var(--ease-expo);
+}
+
+.meta.is-swapping .meta-text {
+  opacity: 0;
+  transform: translateY(2px);
+  transition-duration: var(--ip-exit);
+  transition-timing-function: cubic-bezier(0.4, 0, 1, 1);
 }
 
 /* ---- version toggle ---- */
@@ -240,7 +286,9 @@ button { font: inherit; color: inherit; }
   position: relative;
   display: inline-grid;
   grid-template-columns: repeat(2, 1fr);
-  margin-top: 28px;
+  /* Tight to the value it switches — the two are one unit, and --ip-pad
+     already contributes 4px of optical gap on top of this. */
+  margin-top: 12px;
   padding: 2px;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -302,6 +350,83 @@ button { font: inherit; color: inherit; }
 
 .toggle-btn.is-active { color: var(--bg); }
 
+/* ---- curl hint ---- */
+/* Fixed to the viewport so it costs the hero nothing. Sits at 0.45 opacity —
+   present enough to be found by anyone who looks for it, quiet enough that the
+   page still reads as one number on a field. */
+.curl {
+  position: fixed;
+  bottom: 18px;
+  left: 0;
+  right: 0;
+  margin: 0;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.curl-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: inherit;
+  letter-spacing: inherit;
+  color: var(--fg-muted);
+  opacity: 0.45;
+  transition:
+    opacity 160ms var(--ease),
+    color 160ms var(--ease);
+}
+
+.curl-btn:hover,
+.curl-btn:focus-visible {
+  opacity: 1;
+  color: var(--fg-secondary);
+}
+
+/* Press acknowledgement, same gesture as the IP — lands before the clipboard
+   write resolves, so the button never feels dead on the click itself. */
+.curl-btn:active .curl-label { scale: 0.96; }
+
+.curl-btn[data-copied] {
+  opacity: 1;
+  color: var(--accent-deep);
+}
+
+/* The colour shift alone was too quiet down here: the button already goes to
+   full opacity on hover, so a copy only nudged the hue a few percent while the
+   cursor was on it. The label says the word instead, borrowing the meta line's
+   exit so the two confirmations on the page move the same way. Swapping at
+   opacity 0 also hides the width change between the command and "copied". */
+.curl-label {
+  display: inline-block;
+  transition:
+    opacity 220ms var(--ease-expo),
+    transform 220ms var(--ease-expo),
+    scale 120ms var(--ease);
+}
+
+.curl-btn.is-swapping .curl-label {
+  opacity: 0;
+  transform: translateY(2px);
+  transition-duration: var(--ip-exit);
+  transition-timing-function: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* No hover to reveal it, no shell to paste into. */
+@media (hover: none) {
+  .curl { display: none; }
+}
+
+/* Nothing to anchor it to on a short viewport — it'd collide with the toggle. */
+@media (max-height: 380px) {
+  .curl { display: none; }
+}
+
 /* ---- reduced motion ---- */
 /* Gentler, not zero: the colour swap carries the meaning, so it stays.
    Only the movement goes. */
@@ -321,11 +446,16 @@ button { font: inherit; color: inherit; }
   }
   /* The crossfade still carries "this value was replaced" — only the
      movement and the defocus go. */
-  .ip-text { transition-duration: var(--ip-exit); }
+  .ip-text,
+  .meta-text,
+  .curl-label { transition-duration: var(--ip-exit); }
   .ip-display.is-switching .ip-text {
     transform: none;
     filter: none;
   }
+  .meta.is-swapping .meta-text { transform: none; }
+  .curl-btn.is-swapping .curl-label { transform: none; }
+  .curl-btn:active .curl-label { scale: 1; }
   /* The pill jumps to the new cell instead of travelling; it keeps the theme
      crossfade, which is colour, not motion. */
   .toggle-thumb { transition: background-color 0.2s var(--ease); }
