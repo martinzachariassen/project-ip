@@ -61,6 +61,15 @@ jobs:
             sleep 0.5
           done
 
+          # Hosting answers before the (npm-installed, cold-started)
+          # Functions emulator has finished parsing and registering the
+          # function, so /ip can 404 with "does not exist" for a few
+          # seconds after Hosting is already up.
+          for _ in $(seq 1 120); do
+            curl -s "$base/ip" | grep -qv "does not exist" && break
+            sleep 0.5
+          done
+
           fail=0
           ok()  { echo "ok   $1"; }
           bad() { echo "FAIL $1"; fail=1; }
