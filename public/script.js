@@ -1,6 +1,4 @@
 (() => {
-  "use strict";
-
   const PLACEHOLDER_IP = {
     v4: "84.212.19.77",
     v6: "2a01:79c:cebd:8e40:1c2b:9f3a:44de:1",
@@ -8,14 +6,25 @@
 
   const params = new URLSearchParams(location.search);
 
-  // Dev-only: force the IPv6 placeholder locally. There's no way to reach the
-  // v6 path naturally on a network without IPv6 (curl -6 doesn't route here).
-  const DATA = { ip: PLACEHOLDER_IP[params.has("v6") ? "v6" : "v4"] };
-
   // The family is read off the address itself, not chosen — a single
   // connection only ever tells you the one it came in on.
-  const family = DATA.ip.includes(":") ? "v6" : "v4";
+  let DATA = { ip: "" };
+  let family = "v4";
   const FAMILY_LABEL = { v4: "IPv4", v6: "IPv6" };
+
+  // Dev-only shortcuts for exercising the v6 layout and the failure state
+  // without needing real dual-stack routing.
+  async function fetchIP() {
+    if (params.has("fail")) throw new Error("forced failure");
+    if (params.has("v6")) return PLACEHOLDER_IP.v6;
+    if (params.has("v4")) return PLACEHOLDER_IP.v4;
+
+    const res = await fetch("/ip", { headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error(`/ip responded ${res.status}`);
+    const { ip } = await res.json();
+    if (!ip) throw new Error("/ip returned no address");
+    return ip;
+  }
 
   const DIGITS = "0123456789";
   const HEX = "0123456789abcdef";
@@ -67,7 +76,11 @@
     el.replaceChildren(...groupCells(cells));
 
     if (reduced.matches) {
-      if (perpetual) cells.forEach((c) => c.classList.add("is-scrambling"));
+      if (perpetual) {
+        cells.forEach((c) => {
+          c.classList.add("is-scrambling");
+        });
+      }
       return Promise.resolve();
     }
 
@@ -102,7 +115,8 @@
 
           const locked = !perpetual && t >= s.end;
           if (locked) {
-            if (cells[i].textContent !== chars[i]) cells[i].textContent = chars[i];
+            if (cells[i].textContent !== chars[i])
+              cells[i].textContent = chars[i];
             cells[i].classList.remove("is-scrambling");
             continue;
           }
@@ -115,7 +129,8 @@
               } while (c === chars[i] && pool.length > 1);
               glyph[i] = c;
             }
-            if (cells[i].textContent !== glyph[i]) cells[i].textContent = glyph[i];
+            if (cells[i].textContent !== glyph[i])
+              cells[i].textContent = glyph[i];
             cells[i].classList.add("is-scrambling");
           }
         }
@@ -157,9 +172,9 @@
     if (e.detail > 0) e.currentTarget.blur();
   }
 
-  [ipBtn, curlBtn].forEach((btn) =>
-    btn?.addEventListener("click", dropPointerFocus),
-  );
+  [ipBtn, curlBtn].forEach((btn) => {
+    btn?.addEventListener("click", dropPointerFocus);
+  });
 
   let announceTimer;
   function announce(message) {
@@ -338,8 +353,6 @@
     }
   }
 
-  document.fonts?.ready.then(measureAdvances);
-
   function render() {
     const { ip } = DATA;
     setCopyable(true);
@@ -368,7 +381,10 @@
     if (e.metaKey || e.ctrlKey || e.altKey) return;
 
     const t = e.target;
-    if (t instanceof HTMLElement && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) {
+    if (
+      t instanceof HTMLElement &&
+      (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))
+    ) {
       return;
     }
 
@@ -378,10 +394,22 @@
     }
   });
 
-  if (params.has("fail")) {
-    renderFailure();
-  } else {
-    measureAdvances();
-    render();
+  function boot() {
+    const fontsReady = document.fonts?.ready ?? Promise.resolve();
+    fetchIP().then(
+      (ip) => {
+        DATA = { ip };
+        family = ip.includes(":") ? "v6" : "v4";
+        measureAdvances();
+        fontsReady.then(measureAdvances);
+        render();
+      },
+      () => {
+        renderFailure();
+        fontsReady.then(measureAdvances);
+      },
+    );
   }
+
+  boot();
 })();

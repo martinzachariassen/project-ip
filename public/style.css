@@ -5,7 +5,8 @@
   font-weight: 400;
   font-display: swap;
   src: url("fonts/ibm-plex-mono-400.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
     U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
     U+2212, U+2215, U+FEFF, U+FFFD;
 }
@@ -15,7 +16,8 @@
   font-weight: 700;
   font-display: swap;
   src: url("fonts/ibm-plex-mono-700.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
     U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
     U+2212, U+2215, U+FEFF, U+FFFD;
 }
@@ -25,7 +27,8 @@
   font-weight: 600;
   font-display: swap;
   src: url("fonts/rajdhani-600.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
     U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
     U+2212, U+2215, U+FEFF, U+FFFD;
 }
@@ -35,7 +38,8 @@
   font-weight: 700;
   font-display: swap;
   src: url("fonts/rajdhani-700.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
     U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
     U+2212, U+2215, U+FEFF, U+FFFD;
 }
@@ -83,8 +87,13 @@
 }
 
 /* ---- reset-ish ---- */
-* { box-sizing: border-box; }
-html, body { min-height: 100%; }
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  min-height: 100%;
+}
 
 html {
   /* iOS inflates text in the shorter axis after a rotate, which would resize
@@ -104,19 +113,21 @@ body {
      motion the user didn't ask for, on the element they're trying to read.
      Plain vh stays first as the fallback for browsers without the new units. */
   min-height: 100vh;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: deliberate fallback, see above */
   min-height: 100svh;
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-mono);
-  transition: background-color 0.2s var(--ease), color 0.2s var(--ease);
+  transition:
+    background-color 0.2s var(--ease),
+    color 0.2s var(--ease);
   display: flex;
   align-items: center;
   justify-content: center;
   /* The gutter is the design's margin; the insets are the hardware's. A
      landscape iPhone puts the notch in the left or right inset, so the two are
      added rather than max()'d — the address should clear both. */
-  padding:
-    calc(var(--gutter) + env(safe-area-inset-top))
+  padding: calc(var(--gutter) + env(safe-area-inset-top))
     calc(var(--gutter) + env(safe-area-inset-right))
     calc(var(--gutter) + env(safe-area-inset-bottom))
     calc(var(--gutter) + env(safe-area-inset-left));
@@ -262,7 +273,9 @@ button {
 /* Press acknowledgement — lands before the clipboard write resolves. A 3%
    squish reads as a tap on a 13px button and as a lurch on a 128px one, so the
    hero gets a smaller number than the curl hint below it. */
-.ip-display[data-copyable]:active { transform: scale(0.985); }
+.ip-display[data-copyable]:active {
+  transform: scale(0.985);
+}
 
 /* ---- affordance: hover and keyboard focus ---- */
 /* One switch, --affordance, flipped on .hero so the three signals below stay
@@ -275,9 +288,13 @@ button {
    button, and a dead slot must not light up, promise a rail, or offer to
    copy. */
 @media (hover: hover) and (pointer: fine) {
-  .hero:has(.ip-display[data-copyable]:hover) { --affordance: 1; }
+  .hero:has(.ip-display[data-copyable]:hover) {
+    --affordance: 1;
+  }
 }
-.hero:has(.ip-display[data-copyable]:focus-visible) { --affordance: 1; }
+.hero:has(.ip-display[data-copyable]:focus-visible) {
+  --affordance: 1;
+}
 
 /* 1. The separators light up. Deliberately not the digits: the copy
    confirmation is a full accent wash across every glyph, and if hover already
@@ -383,7 +400,9 @@ button {
   cursor: default;
   color: var(--fg-muted);
 }
-.ip-display.is-failed .cell { opacity: 0.45; }
+.ip-display.is-failed .cell {
+  opacity: 0.45;
+}
 
 /* IPv6 is up to 39 chars vs IPv4's 15 — needs its own fit or it overflows.
    Only the type shrinks; the slot height stays pinned to --ip-slot. */
@@ -457,7 +476,9 @@ button {
   transition: color 180ms var(--ease);
 }
 
-.meta[data-copied] { color: var(--accent-deep); }
+.meta[data-copied] {
+  color: var(--accent-deep);
+}
 
 /* Same exit as the IP value, one beat softer: the meta line is subordinate, so
    it drops rather than defocuses. Sharing --ip-exit is what makes the two read
@@ -523,11 +544,17 @@ button {
 
 /* Which of the two hints is the true one. Only one is ever in the layout, so
    the absolute positioning above can't stack them on each other. */
-.copy-hint-coarse { display: none; }
+.copy-hint-coarse {
+  display: none;
+}
 
 @media (hover: none), (pointer: coarse) {
-  .copy-hint-fine { display: none; }
-  .copy-hint-coarse { display: block; }
+  .copy-hint-fine {
+    display: none;
+  }
+  .copy-hint-coarse {
+    display: block;
+  }
 
   /* --affordance never fires here: it is driven by hover, and there isn't any.
      So the hint stands at rest instead of waiting to be revealed — without it
@@ -540,7 +567,9 @@ button {
      rather than left to the rule above, which this selector now outweighs:
      a hint on how to do the thing that was just done is the one moment it's
      noise, and it has to be gone while the row says "copied". */
-  .hero:has(.ip-display[data-copyable]) .meta:not([data-copied]) .copy-hint-coarse {
+  .hero:has(.ip-display[data-copyable])
+    .meta:not([data-copied])
+    .copy-hint-coarse {
     opacity: 0.75;
     translate: none;
     transition-delay: 0s;
@@ -598,7 +627,9 @@ button {
 
 /* Press acknowledgement, same gesture as the IP — lands before the clipboard
    write resolves, so the button never feels dead on the click itself. */
-.curl-btn:active .curl-label { scale: 0.96; }
+.curl-btn:active .curl-label {
+  scale: 0.96;
+}
 
 .curl-btn[data-copied] {
   opacity: 1;
@@ -627,12 +658,16 @@ button {
 
 /* No hover to reveal it, no shell to paste into. */
 @media (hover: none) {
-  .curl { display: none; }
+  .curl {
+    display: none;
+  }
 }
 
 /* Nothing to anchor it to on a short viewport — it'd collide with the address/meta block. */
 @media (max-height: 380px) {
-  .curl { display: none; }
+  .curl {
+    display: none;
+  }
 }
 
 /* ---- reduced motion ---- */
@@ -642,7 +677,9 @@ button {
   .ip-display {
     transition-duration: 0.01ms;
   }
-  .ip-display[data-copyable]:active { transform: none; }
+  .ip-display[data-copyable]:active {
+    transform: none;
+  }
   /* The affordance is a fade, not a sweep: the rail arrives at full width and
      the hint doesn't rise into place. Both still appear — they're the only
      thing telling you the number is a button. */
@@ -666,10 +703,18 @@ button {
   /* The crossfade still carries "this value was replaced" — only the
      movement goes. */
   .meta-text,
-  .curl-label { transition-duration: var(--ip-exit); }
-  .meta.is-swapping .meta-text { transform: none; }
-  .curl-btn.is-swapping .curl-label { transform: none; }
-  .curl-btn:active .curl-label { scale: 1; }
+  .curl-label {
+    transition-duration: var(--ip-exit);
+  }
+  .meta.is-swapping .meta-text {
+    transform: none;
+  }
+  .curl-btn.is-swapping .curl-label {
+    transform: none;
+  }
+  .curl-btn:active .curl-label {
+    scale: 1;
+  }
 }
 
 /* ---- utilities ---- */
@@ -683,4 +728,29 @@ button {
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+
+/* ---- 404 page ---- */
+.notfound {
+  display: flex;
+  min-height: 100vh;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: deliberate fallback, see body rule above */
+  min-height: 100svh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  text-align: center;
+  padding: 1.5rem;
+}
+.notfound-code {
+  font-family: "Rajdhani", var(--font-mono);
+  font-weight: 700;
+  font-size: clamp(2.5rem, 8vw, 4rem);
+}
+.notfound-quip {
+  color: var(--fg-muted);
+}
+.notfound a {
+  color: var(--fg);
 }

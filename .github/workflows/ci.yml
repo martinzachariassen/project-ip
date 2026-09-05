@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Read-only: every dependency comes from the public npm registry.
+permissions:
+  contents: read
+
+# Newer pushes cancel in-flight runs.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # Bun version comes from mise.toml — single source of truth. Bun is
+      # the package manager for the site tooling; functions/ is plain npm
+      # (Cloud Functions' buildpack only recognizes npm/yarn lockfiles).
+      - name: Set up mise (installs Bun from mise.toml)
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint & format check
+        run: bun run lint
+
+      - name: Install function dependencies
+        working-directory: functions
+        run: npm ci
+
+      # Serves public/ and /ip through the Hosting + Functions emulators and
+      # asserts what firebase.json can't check itself — notably that
+      # `headers` is last-match-wins, so a reorder could silently let the
+      # catch-all max-age=0 clobber a specific cache rule.
+      - name: Check firebase.json headers, cache policy, and /ip
+        env:
+          PORT: "5000"
+        run: |
+          set -euo pipefail
+          base="http://127.0.0.1:$PORT"
+
+          bunx firebase-tools emulators:start --only hosting,functions --project what-is-my-ip-f7210 > emulator.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+
+          # Wait up to 60s for the emulator to bind.
+          for _ in $(seq 1 120); do
+            curl -sf -o /dev/null "$base/" && break
+            sleep 0.5
+          done
+
+          fail=0
+          ok()  { echo "ok   $1"; }
+          bad() { echo "FAIL $1"; fail=1; }
+
+          # Response headers for a URL, one per line.
+          headers() { curl -s -D - -o /dev/null "$1"; }
+
+          # Catches a deleted/mistyped header, otherwise invisible until someone scans the site.
+          for header in content-security-policy strict-transport-security x-content-type-options x-frame-options referrer-policy permissions-policy; do
+            if headers "$base/" | grep -qi "^$header:"; then
+              ok "header $header present"
+            else
+              bad "header $header missing"
+            fi
+          done
+
+          # 404.html's filename is the whole contract with Hosting; a rename degrades silently.
+          status="$(curl -s -o /dev/null -w '%{http_code}' "$base/nope")"
+          if [ "$status" = "404" ] && curl -s "$base/nope" | grep -q 'class="notfound"'; then
+            ok "unknown path serves the custom 404 page"
+          else
+            bad "unknown path did not serve the custom 404 page (status $status)"
+          fi
+
+          # Confirms firebase.json's ignore list keeps it from ever being served.
+          if [ "$(curl -s -o /dev/null -w '%{http_code}' "$base/firebase.json")" = "404" ]; then
+            ok "firebase.json is not served"
+          else
+            bad "firebase.json is served"
+          fi
+
+          # Without revalidation, a deploy could stay invisible for Hosting's default hour of caching.
+          if headers "$base/" | grep -qi '^cache-control:.*must-revalidate'; then
+            ok "HTML is revalidated"
+          else
+            bad "HTML is not revalidated"
+          fi
+
+          # Favicon has a stable URL, so it must not be immutable (200 checked
+          # first so a missing/renamed file can't pass this vacuously).
+          favicon="$base/favicon.svg"
+          if [ "$(curl -s -o /dev/null -w '%{http_code}' "$favicon")" != "200" ]; then
+            bad "favicon is not served (cannot check its cache policy)"
+          elif headers "$favicon" | grep -qi '^cache-control:.*immutable'; then
+            bad "favicon marked immutable"
+          else
+            ok "favicon is served and not immutable"
+          fi
+
+          # /ip: plain text by default (curl-friendly), JSON on request, never cached.
+          plain="$(curl -s "$base/ip")"
+          if echo "$plain" | grep -qE '^[0-9a-fA-F:.]+$'; then
+            ok "/ip returns a bare address as plain text"
+          else
+            bad "/ip did not return a bare address (got: $plain)"
+          fi
+
+          json="$(curl -s -H 'Accept: application/json' "$base/ip")"
+          if echo "$json" | grep -q '"ip"'; then
+            ok "/ip returns JSON when asked"
+          else
+            bad "/ip did not return JSON (got: $json)"
+          fi
+
+          if headers "$base/ip" | grep -qi '^cache-control:.*no-store'; then
+            ok "/ip is not cached"
+          else
+            bad "/ip is missing no-store"
+          fi
+
+          if [ "$fail" -ne 0 ]; then
+            echo "--- emulator log ---"
+            cat emulator.log
+          fi
+          exit "$fail"

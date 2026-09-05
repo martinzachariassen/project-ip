@@ -1,0 +1,13 @@
+{
+  "name": "functions",
+  "private": true,
+  "description": "Cloud Function backing /ip on ip.mlz.no — echoes the caller's real address.",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.3.0",
+    "firebase-functions": "^6.0.0"
+  }
+}
