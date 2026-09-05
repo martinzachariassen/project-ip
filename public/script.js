@@ -10,7 +10,7 @@
   // connection only ever tells you the one it came in on.
   let DATA = { ip: "" };
   let family = "v4";
-  const FAMILY_LABEL = { v4: "IPv4", v6: "IPv6" };
+  const SHORTCUT_HINT = "press C to copy plain · R for CIDR · Q for a QR code";
 
   // Dev-only shortcuts for exercising the v6 layout and the failure state
   // without needing real dual-stack routing.
@@ -157,8 +157,10 @@
   const statusEl = document.getElementById("status");
   const curlBtn = document.getElementById("curl");
   const curlLabel = document.getElementById("curl-label");
+  const qrPanel = document.getElementById("qr-panel");
+  const qrPlate = document.getElementById("qr-plate");
 
-  const state = { failed: false, copyable: false, meta: "" };
+  const state = { failed: false, copyable: false, meta: "", qrOpen: false };
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -237,9 +239,8 @@
     }
   }
 
-  async function copyIP() {
+  async function copyValue(text, confirmText, announceText) {
     if (!state.copyable) return;
-    const { ip } = DATA;
 
     ipBtn.dataset.copied = "";
     clearTimeout(copyTimer);
@@ -247,12 +248,78 @@
       delete ipBtn.dataset.copied;
     }, 1500);
 
-    const ok = await copyText(ip);
-    flashMeta(ok ? "copied to clipboard" : "copy failed");
-    announce(ok ? "IP address copied" : "Copy failed");
+    const ok = await copyText(text);
+    flashMeta(ok ? confirmText : "copy failed");
+    announce(ok ? announceText : "Copy failed");
+  }
+
+  function copyIP() {
+    return copyValue(DATA.ip, "copied to clipboard", "IP address copied");
+  }
+
+  function copyCIDR() {
+    const cidr = `${DATA.ip}/${family === "v6" ? 128 : 32}`;
+    return copyValue(cidr, `copied ${cidr}`, "IP address copied as CIDR");
   }
 
   ipBtn.addEventListener("click", copyIP);
+
+  const SVG_NS = "http://www.w3.org/2000/svg";
+
+  // qrcode-generator has no auto version — the smallest one an address
+  // actually fits in depends on its length, so this just tries each in turn.
+  function buildQR(text) {
+    for (let type = 1; type <= 40; type++) {
+      try {
+        const qr = qrcode(type, "M");
+        qr.addData(text);
+        qr.make();
+        return qr;
+      } catch {
+        // Doesn't fit at this version yet — the next one will.
+      }
+    }
+    return null;
+  }
+
+  function renderQR() {
+    qrPlate.replaceChildren();
+    const qr = buildQR(DATA.ip);
+    if (!qr) return;
+
+    const n = qr.getModuleCount();
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${n} ${n}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", `QR code for ${DATA.ip}`);
+
+    const bg = document.createElementNS(SVG_NS, "rect");
+    bg.setAttribute("width", String(n));
+    bg.setAttribute("height", String(n));
+    bg.setAttribute("fill", "#fff");
+    svg.appendChild(bg);
+
+    let d = "";
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
+      }
+    }
+    const modules = document.createElementNS(SVG_NS, "path");
+    modules.setAttribute("d", d);
+    modules.setAttribute("fill", "#000");
+    svg.appendChild(modules);
+
+    qrPlate.appendChild(svg);
+  }
+
+  function setQR(open) {
+    if (!state.copyable) return;
+    state.qrOpen = open;
+    qrPanel.dataset.open = String(open);
+    qrPanel.setAttribute("aria-hidden", String(!open));
+    if (open) renderQR();
+  }
 
   const CURL_CMD = curlLabel?.textContent.trim() ?? "";
 
@@ -358,7 +425,7 @@
     setCopyable(true);
     ipBtn.dataset.version = family;
     ipLabel.textContent = `Copy IP address ${ip}`;
-    setMeta(FAMILY_LABEL[family]);
+    setMeta(SHORTCUT_HINT);
     scramble(ipText, ip, TIMING.boot[family]);
   }
 
@@ -388,9 +455,16 @@
       return;
     }
 
-    if (e.key.toLowerCase() === "c") {
+    const key = e.key.toLowerCase();
+    if (key === "c") {
       e.preventDefault();
       copyIP();
+    } else if (key === "r") {
+      e.preventDefault();
+      copyCIDR();
+    } else if (key === "q") {
+      e.preventDefault();
+      setQR(!state.qrOpen);
     }
   });
 

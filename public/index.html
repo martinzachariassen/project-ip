@@ -24,9 +24,13 @@
 
       <p id="meta" class="meta">
         <span id="meta-text" class="meta-text"></span>
-        <span class="copy-hint copy-hint-fine" aria-hidden="true">click to copy · or press C</span>
         <span class="copy-hint copy-hint-coarse" aria-hidden="true">tap to copy</span>
       </p>
+
+      <div id="qr-panel" class="qr-panel" data-open="false" aria-hidden="true">
+        <div id="qr-plate" class="qr-plate"></div>
+        <p class="qr-caption">Scan to get this address on your phone.</p>
+      </div>
     </section>
 
     <p id="status" class="sr-only" role="status" aria-atomic="true"></p>
@@ -42,6 +46,7 @@
     <p class="meta">JavaScript is required to look up your IP address.</p>
   </noscript>
 
+  <script src="qrcode.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
