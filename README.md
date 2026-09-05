@@ -55,9 +55,9 @@ The one exception is `/ip`, rewritten by Hosting to a Cloud Function
 off `X-Forwarded-For` and responds with plain text by default — so
 `curl ip.mlz.no/ip` returns a bare address — or JSON when asked
 (`Accept: application/json`), which is what the page's own script uses to
-render the animation. The function's ingress is locked to Hosting's traffic
-only, so the address can't be spoofed by calling the function's Cloud Run
-URL directly, and its response is always `Cache-Control: no-store`.
+render the animation. Its response is always `Cache-Control: no-store` —
+nothing here is per-visitor data worth caching, or worth restricting ingress
+over, since the address is only ever displayed back to the caller.
 
 CI (`.github/workflows/ci.yml`) boots the Hosting + Functions emulators and
 asserts that headers, cache rules, and `/ip` actually behave as configured —

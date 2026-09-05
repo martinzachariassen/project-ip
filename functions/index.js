@@ -1,13 +1,13 @@
 const { onRequest } = require("firebase-functions/v2/https");
 
-// Reachable only through the Hosting rewrite for /ip — ingress is locked to
-// internal+GCLB traffic, so nobody can hit this function's own Cloud Run URL
-// directly with a spoofed X-Forwarded-For. Hosting puts the real client
-// address first in that header.
+// ALLOW_INTERNAL_AND_GCLB would block this function's own cloudfunctions.net
+// URL, which is also the path Firebase Hosting's rewrite uses internally —
+// so ingress has to stay ALLOW_ALL. That means someone could hit the raw
+// Cloud Run URL directly with a spoofed X-Forwarded-For; harmless here since
+// nothing downstream trusts this endpoint's address for anything but display.
 exports.ip = onRequest(
   {
     region: "europe-west1",
-    ingressSettings: "ALLOW_INTERNAL_AND_GCLB",
     cors: false,
   },
   (req, res) => {

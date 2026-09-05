@@ -6,7 +6,12 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["public/*.js", "public/*.css", "functions/*.js"]
+    "includes": [
+      "public/*.js",
+      "public/*.css",
+      "functions/*.js",
+      "!public/qrcode.js"
+    ]
   },
   "formatter": {
     "enabled": true,
