@@ -23,6 +23,55 @@
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
 
   /**
+   * Bundles each octet/hextet with the separator that follows it, so a line
+   * break can only ever land between groups. A narrow screen breaks IPv6
+   * across two lines to buy back type size, and a break inside `cebd` would
+   * read as a rendering fault rather than as an address on two lines.
+   * Done on every render: the grouping is inert while .ip-text is `nowrap`,
+   * which keeps the wrapping layout from being a separate DOM shape that only
+   * some code paths produce.
+   */
+  function groupCells(cells) {
+    const groups = [];
+    let group = null;
+    for (const cell of cells) {
+      if (!group) {
+        group = document.createElement("span");
+        group.className = "group";
+        groups.push(group);
+      }
+      group.appendChild(cell);
+      if (cell.classList.contains("sep")) group = null;
+    }
+    return groups;
+  }
+
+  // One span per character. Split out of scramble() because the width measuring
+  // further down builds the very same spans to find out how wide a value will
+  // be — and a measurement of something assembled differently from the thing on
+  // screen is a measurement of the wrong object.
+  function buildCells(target) {
+    return [...target].map((ch, i) => {
+      const span = document.createElement("span");
+      span.className = SEPARATOR.test(ch) ? "cell sep" : "cell";
+      span.style.setProperty("--i", i);
+      span.textContent = ch;
+      return span;
+    });
+  }
+
+  // The empty state's word. Opts out of the 1ch column grid — that width is the
+  // advance of "0", which is right for digits and stacks "no IPv6" into a
+  // smear. Still a `.cell`, so the dimming that marks a dead slot finds it.
+  function buildWordCell(text) {
+    const span = document.createElement("span");
+    span.className = "cell word";
+    span.style.setProperty("--i", 0);
+    span.textContent = text;
+    return span;
+  }
+
+  /**
    * Time-based (not frame-based) so it runs identically at 60/120/144Hz.
    * Separators stay pinned — they're the skeleton that says "this is an IP"
    * from the first frame, and they make the reveal read as filling-in.
@@ -43,14 +92,8 @@
     const n = chars.length;
 
     // Build one span per character once; per frame we only touch textContent.
-    const cells = chars.map((ch, i) => {
-      const span = document.createElement("span");
-      span.className = SEPARATOR.test(ch) ? "cell sep" : "cell";
-      span.style.setProperty("--i", i);
-      span.textContent = ch;
-      return span;
-    });
-    el.replaceChildren(...cells);
+    const cells = buildCells(target);
+    el.replaceChildren(...groupCells(cells));
 
     // Perpetual churn is exactly the kind of motion this guideline exists for,
     // so the failure state goes static too — the dimmed styling still reads.
@@ -371,17 +414,136 @@
   }
 
   // The empty state can't go through scramble(): those cells are a digit grid
-  // pinned to `width: 1ch`, which stacks letters on top of each other. One
-  // span that opts out of the grid — but still a `.cell`, so it inherits the
-  // dimming the failure and empty states share.
+  // pinned to `width: 1ch`, which stacks letters on top of each other. See
+  // buildWordCell for the span that opts out of it.
   function setWord(el, text) {
     cancelAnimationFrame(el._scrambleRAF);
-    const span = document.createElement("span");
-    span.className = "cell word";
-    span.style.setProperty("--i", 0);
-    span.textContent = text;
-    el.replaceChildren(span);
+    el.replaceChildren(...groupCells([buildWordCell(text)]));
   }
+
+  /* ---------- fitting the type to the width ---------- */
+  // style.css sizes the address by dividing the width available by how many ems
+  // wide the value will be — the only way one rule can serve a 7-character IPv4
+  // and a 39-character IPv6 without either overflowing or wasting the screen.
+  // That divisor is the one thing CSS cannot work out for itself: it depends on
+  // the metrics of the loaded font. So it is measured here and handed over as
+  // a custom property, and CSS keeps every actual decision — the ceilings, the
+  // gutter, how many lines IPv6 gets, when to change its mind on a resize.
+
+  const heroEl = document.querySelector(".hero");
+
+  // Measuring is done by building the value for real, in a hidden twin of the
+  // display, and reading its width — not by adding up font metrics. The width
+  // of an address here is not the width of the string: .cell pins every
+  // non-separator glyph to `1ch` to hold the digits in a fixed column, the
+  // separators keep their natural advance, the empty state's word opts out of
+  // the grid entirely, and IPv6 carries letter-spacing IPv4 doesn't. Every one
+  // of those is a rule in style.css, and re-deriving them here would be a
+  // second copy of the layout that can silently fall out of step with the
+  // first. The twin carries the same classes, so the same rules apply to it.
+  const RULER_PX = 100; // measure big, divide down: keeps rounding out of it
+
+  const rulerBox = document.createElement("span");
+  rulerBox.className = "ip-display";
+  rulerBox.setAttribute("aria-hidden", "true");
+  rulerBox.style.cssText =
+    // Out of flow, out of sight, and released from every constraint the real
+    // display is under — the fitted size, the fixed slot, the side padding.
+    // Those exist to make a value fit; the question here is how much room the
+    // value wants in the first place.
+    "position:absolute;left:-9999px;top:0;visibility:hidden;" +
+    `font-size:${RULER_PX}px;height:auto;max-width:none;padding:0;`;
+
+  const ruler = document.createElement("span");
+  ruler.className = "ip-text";
+  // The narrow-screen rule lets IPv6 wrap. A ruler that wraps reports the width
+  // of a line rather than of the address, which is the wrong answer twice over:
+  // it is the number the wrap itself is derived from.
+  ruler.style.cssText = "flex-wrap:nowrap;max-width:none;";
+  rulerBox.appendChild(ruler);
+  heroEl.appendChild(rulerBox);
+
+  // `version` sets which of the two type treatments applies — IPv6's extra
+  // letter-spacing lands on the separators, which are the only cells free to
+  // take it.
+  function advanceOf(version, cells) {
+    rulerBox.dataset.version = version;
+    ruler.replaceChildren(...groupCells(cells));
+    return ruler.getBoundingClientRect().width / RULER_PX;
+  }
+
+  const gridAdvance = (text, version) => advanceOf(version, buildCells(text));
+  const wordAdvance = (text) => advanceOf("v4", [buildWordCell(text)]);
+
+  // The width the wider line needs once the address is split across two, using
+  // the split point that balances them best. The browser fills greedily rather
+  // than optimally, but it can only do better than this: given a max-width of
+  // `best` it takes at least as many groups onto the first line as the balanced
+  // split would, which leaves the second line no wider than the balanced one.
+  function twoLineAdvance(ip) {
+    const parts = ip.split(":");
+    const widths = parts.map((g, i) =>
+      gridAdvance(i < parts.length - 1 ? `${g}:` : g, "v6"),
+    );
+    const total = widths.reduce((a, b) => a + b, 0);
+    let best = total; // a single group can't be split; the line is the whole
+    let head = 0;
+    for (let i = 0; i < widths.length - 1; i++) {
+      head += widths[i];
+      best = Math.min(best, Math.max(head, total - head));
+    }
+    return best;
+  }
+
+  // Which value each tab will actually draw, and how. An absent family shows a
+  // word rather than an address, and a failed lookup shows the same churning
+  // placeholder on both tabs.
+  function shownValue(version) {
+    if (state.failed) return { text: "0.0.0.0", size: "v4" };
+    const entry = DATA[version];
+    return entry
+      ? { text: entry.ip, size: version }
+      : { text: EMPTY[version].word, size: "word" };
+  }
+
+  function measureAdvances() {
+    const advance = (v) =>
+      v.size === "word" ? wordAdvance(v.text) : gridAdvance(v.text, v.size);
+
+    // An empty or failed v6 tab renders at the *v4* size — render() pins
+    // data-version to v4 for it, because v6's smaller type exists to fit 39
+    // characters and a seven-character word doesn't need it. So it shares v4's
+    // divisor, and the widest of everything drawn at that size wins: sizing to
+    // anything narrower would let one of the others overflow.
+    const sized6 = !state.failed && !!DATA.v6;
+    const atV4 = [advance(shownValue("v4"))];
+    if (!sized6) atV4.push(advance(shownValue("v6")));
+
+    const set = (name, value) => heroEl.style.setProperty(name, value.toFixed(4));
+    set("--adv4", Math.max(...atV4));
+
+    // Tells CSS whether the v6 terms in the slot-height and wrap maths describe
+    // anything real. Without it a narrow viewport would reserve two lines of
+    // height for a v6 tab that is showing a single short word.
+    heroEl.dataset.v6 = sized6 ? "address" : "none";
+    if (sized6) {
+      set("--adv6", advance(shownValue("v6")));
+      set("--adv6h", twoLineAdvance(DATA.v6.ip));
+    } else {
+      heroEl.style.removeProperty("--adv6");
+      heroEl.style.removeProperty("--adv6h");
+    }
+  }
+
+  // The first measurement necessarily lands before Rajdhani is in — laying the
+  // ruler out is itself what asks the browser for it — so it measures the
+  // fallback, and the two typefaces are not the same width. Both faces are
+  // preloaded, so the correction arrives well inside the reveal animation, but
+  // it does have to arrive.
+  // `ready` rather than a `loadingdone` listener, which only fires for a batch
+  // still in flight when it is attached: the promise has one resolution and
+  // `then` runs on it whether the fonts land before this line or long after.
+  document.fonts?.ready.then(measureAdvances);
 
   function render(version, { animate = true, fast = false } = {}) {
     const entry = DATA[version];
@@ -433,6 +595,7 @@
 
   function renderFailure() {
     state.failed = true;
+    measureAdvances(); // both tabs now show the placeholder, not an address
     setCopyable(false);
     ipBtn.classList.add("is-failed");
     ipBtn.dataset.version = "v4";
@@ -511,6 +674,9 @@
   if (params.has("fail")) {
     renderFailure();
   } else {
+    // Before the first render, so the reveal is drawn at its final size rather
+    // than resized out from under itself on the next frame.
+    measureAdvances();
     // Real traffic always lands on v4. A ?noXX flag boots onto the family it
     // removed instead — the empty state is the whole reason you passed the
     // flag, and making you click the toggle to reach it just hides it.

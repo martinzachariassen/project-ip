@@ -56,6 +56,12 @@
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --ease-expo: cubic-bezier(0.19, 1, 0.22, 1);
 
+  /* The side margin, and the one number the whole width budget is measured
+     against. Fluid rather than fixed because 20px is a comfortable frame at
+     1440px and a fifth of the usable width at 320px — a phone should spend
+     its pixels on the address, not on empty edges. */
+  --gutter: clamp(12px, 4vw, 32px);
+
   /* How long an outgoing value takes to leave. Lives on :root because the IP
      and the meta line exit together as one unit, and read back by script.js —
      style.css stays the single source of truth for the timing. */
@@ -79,9 +85,26 @@
 /* ---- reset-ish ---- */
 * { box-sizing: border-box; }
 html, body { min-height: 100%; }
+
+html {
+  /* iOS inflates text in the shorter axis after a rotate, which would resize
+     the one number on the page for no reason the user asked for. The layout
+     already fits itself to the viewport; it doesn't need help. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
+  /* svh, not vh: `100vh` on a phone is the viewport with the browser chrome
+     *retracted*, so a centred layout sized to it sits partly behind the
+     address bar until you scroll. svh is the smallest the viewport ever gets,
+     which is the only height guaranteed to be visible at rest. dvh would fit
+     too, but it re-centres the whole page every time the toolbar slides —
+     motion the user didn't ask for, on the element they're trying to read.
+     Plain vh stays first as the fallback for browsers without the new units. */
   min-height: 100vh;
+  min-height: 100svh;
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-mono);
@@ -89,7 +112,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  /* The gutter is the design's margin; the insets are the hardware's. A
+     landscape iPhone puts the notch in the left or right inset, so the two are
+     added rather than max()'d — the address should clear both. */
+  padding:
+    calc(var(--gutter) + env(safe-area-inset-top))
+    calc(var(--gutter) + env(safe-area-inset-right))
+    calc(var(--gutter) + env(safe-area-inset-bottom))
+    calc(var(--gutter) + env(safe-area-inset-left));
   overflow-x: hidden;
 }
 
@@ -102,13 +132,28 @@ body {
   outline-offset: 2px;
 }
 
-button { font: inherit; color: inherit; }
+button {
+  font: inherit;
+  color: inherit;
+  /* Tells the browser this element has no double-tap-to-zoom behaviour to wait
+     for, which is what removes the ~300ms delay before a tap registers. */
+  touch-action: manipulation;
+  /* Every button on the page draws its own press state; the grey box Android
+     and iOS flash on top of that is a second, uglier answer to the same tap. */
+  -webkit-tap-highlight-color: transparent;
+}
 
 /* ---- panel ---- */
+/* The size container everything below measures against. `cqw` rather than `vw`
+   for the width budget: vw counts the scrollbar gutter, so on a desktop window
+   with a visible scrollbar a value fitted to "100vw minus margins" is fitted to
+   a width that isn't there, and overflows by exactly the scrollbar. cqw is the
+   panel's real content box, which is the box the address actually sits in. */
 .panel {
   position: relative;
   width: 100%;
   max-width: 900px;
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -118,37 +163,92 @@ button { font: inherit; color: inherit; }
 /* Column, not just centred text: the IP and the toggle are both inline-level
    boxes, so in a plain text flow they share a line and sit side by side. Each
    needs its own row — the toggle reads as a control *for* the value above it,
-   not as something next to it. */
+   not as something next to it.
+
+   The custom properties on it are how the address gets its size.
+   The old rule was `font-size: clamp(1.6rem, 9vw, 8rem)`, and a plain vw ramp
+   can only ever be right for one string length. IPv4 is 7–15 characters and
+   IPv6 is up to 39, so a ramp tuned so the longest IPv6 never overflows leaves
+   a short IPv4 at a third of the width it could have had — on a 375px phone the
+   address was drawn at 34px inside 335px of space it was allowed to use.
+   Below, the type is fitted to the width instead: script.js measures how many
+   ems wide the value it is about to draw will be (--adv4/--adv6/--adv6h, see
+   measureAdvances) and CSS divides the available width by that. The result is
+   the largest size at which this particular address fits, whatever its length
+   and whatever the viewport — and a longer address simply arrives smaller
+   rather than being clipped.
+   CSS keeps every decision that is a judgement call (the ceilings, the gutter,
+   how many lines IPv6 gets); JS supplies only the one number it alone can know,
+   which is how wide the glyphs actually are. */
 .hero {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  /* Full panel width rather than shrink-wrapped to the address. The meta row
+     stretches to the hero (see .meta), so a shrink-wrapped hero handed the
+     longest status line — "v4-only network · nothing to copy" — a box the width
+     of a seven-character word to fit in. Everything inside stays centred; only
+     the room available to a line of text changes. */
+  align-self: stretch;
+
+  /* The width the value gets to spend, inside the button's own side padding. */
+  --ip-pad: 4px;
+  --ip-pad-x: 8px;
+  --ip-avail: calc(100cqw - 2 * var(--ip-pad-x));
+
+  /* Two ceilings, so "fit the width" never becomes "fill the screen".
+     --cap-w keeps the type in proportion to the panel on a wide monitor;
+     --cap-h keeps it in proportion to a short one, which is the landscape
+     phone case — 640px of width and 375px of height would otherwise produce a
+     number tall enough to push its own toggle off the bottom. */
+  --cap-w: clamp(2rem, 14cqw, 8.5rem);
+  --cap-h: 26svh;
+  --cap: min(var(--cap-w), var(--cap-h));
+
+  /* IPv6 gets a lower ceiling than IPv4. Fitted to width it would otherwise
+     out-grow the panel's composition on a large screen: 39 characters spanning
+     900px reads as a banner, not as a value. */
+  --cap6: min(var(--cap), 3.5rem);
+
+  --fs4: min(var(--cap), calc(var(--ip-avail) / var(--adv4, 7)));
+  --fs6: min(var(--cap6), calc(var(--ip-avail) / var(--adv6, 18.6)));
+
+  /* How tall the IPv6 block is, in multiples of its own type size. Overridden
+     to two lines on a narrow viewport; see the wrap rule further down. */
+  --lines6: 1;
+
+  /* One reserved slot, tall enough for whichever version needs more, so
+     switching between them can't move the toggle under the finger that just
+     pressed it. Both terms are known up front because script.js measures both
+     versions on every render, not just the one on screen. */
+  --ip-slot: max(var(--fs4), calc(var(--fs6) * var(--lines6)));
 }
 
 .ip-display {
-  /* The box is a fixed slot sized to the IPv4 type, padding included (see
-     --ip-pad). The IPv6 type is smaller and just centres inside it, so
-     switching versions can't change the hero's height — nothing on the page
-     moves. `height`, not `min-height`: min-height excluded the padding, which
-     left v4 8px taller than v6 and shifted the whole centred layout. */
-  --ip-pad: 4px;
-  --ip-slot: clamp(1.6rem, 9vw, 8rem);
+  /* The box is a fixed slot (--ip-slot), padding included (see --ip-pad).
+     Whichever version is showing sits inside it, so switching versions can't
+     change the hero's height — nothing on the page moves. `height`, not
+     `min-height`: min-height excluded the padding, which left v4 8px taller
+     than v6 and shifted the whole centred layout. (Where the value sits in the
+     slot is `align-items`, which the narrow-screen rule further down changes
+     once two-line IPv6 makes the slot taller than IPv4 needs.) */
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  max-width: 100%;
   height: calc(var(--ip-slot) + 2 * var(--ip-pad));
   background: none;
   border: none;
   cursor: pointer;
   font-family: "Rajdhani", var(--font-mono);
   font-weight: 700;
-  font-size: var(--ip-slot);
+  font-size: var(--fs4);
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
   color: var(--fg);
-  padding: var(--ip-pad) 8px;
+  padding: var(--ip-pad) var(--ip-pad-x);
   border-radius: 4px;
   line-height: 1;
   white-space: nowrap;
@@ -227,6 +327,10 @@ button { font: inherit; color: inherit; }
    defocus on a 128px IPv4 and a 13px IPv6. */
 .ip-text {
   display: inline-flex;
+  /* Never by default — only the narrow-screen IPv6 rule opts in, and it brings
+     its own max-width to say where the break goes. */
+  flex-wrap: nowrap;
+  justify-content: center;
   position: relative; /* containing block for the hover rail */
   transition:
     opacity 220ms var(--ease-expo),
@@ -240,6 +344,17 @@ button { font: inherit; color: inherit; }
   filter: blur(0.05em);
   transition-duration: var(--ip-exit);
   transition-timing-function: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* One hextet or octet and the separator that follows it, kept together. The
+   line above is allowed to wrap; this is what stops it wrapping in the middle
+   of a group, which would read as a rendering fault rather than as an address
+   on two lines. Present on every render, wrapping or not — it costs nothing
+   when .ip-text is nowrap, and it means the grouping isn't a special case the
+   narrow layout has to switch on. */
+.group {
+  display: inline-flex;
+  white-space: nowrap;
 }
 
 /* 1ch == advance width of "0", so digits are pinned to a fixed column
@@ -299,11 +414,73 @@ button { font: inherit; color: inherit; }
 .ip-display.is-failed .cell,
 .ip-display.is-empty .cell { opacity: 0.45; }
 
-/* IPv6 is 39 chars vs IPv4's 15 — needs its own scale or it overflows.
+/* IPv6 is up to 39 chars vs IPv4's 15 — needs its own fit or it overflows.
    Only the type shrinks; the slot height stays pinned to --ip-slot. */
 .ip-display[data-version="v6"] {
-  font-size: clamp(0.8rem, 3.4vw, 2.8rem);
+  font-size: var(--fs6);
   letter-spacing: 0.01em;
+}
+
+/* ---- IPv6 on a narrow screen ---- */
+/* On one line, a full-length IPv6 fitted to a 375px phone lands at ~18px: it
+   is *legible*, but it is body-copy size for the one thing the page exists to
+   show. Broken across two lines the same address fits at nearly double that,
+   because each line carries half the characters.
+   The breakpoint is where the single-line fit drops below roughly 24px, so
+   this only ever engages on phones — a tablet and up has the width to keep the
+   address on one line, which is the better composition when it's affordable.
+   Wrapping is opt-in rather than the default because a flex line that is free
+   to wrap will also wrap when the *panel* runs out of room on a desktop, and
+   an IPv6 splitting itself in two at 900px is a bug, not a layout. */
+@media (max-width: 480px) {
+  .hero {
+    /* Half an address instead of a whole one — see twoLineAdvance in
+       script.js, which picks the split point that balances the two lines and
+       reports the width the wider of them needs.
+       The extra 2% is what makes the wrap land where it was designed to. Fitted
+       exactly, the four groups of the first line come to precisely the width
+       available, and subpixel rounding then decides — wrongly, in practice —
+       that the fourth doesn't fit, breaking the address across three ragged
+       lines instead of two balanced ones. Paying 2% of type size buys the
+       slack that settles it. */
+    --fs6: min(var(--cap6), calc(var(--ip-avail) / var(--adv6h, 9.4) / 1.02));
+    /* Two lines plus the row-gap below, so the reserved slot is tall enough
+       for the block the wrap produces. */
+    --lines6: 2.08;
+  }
+
+  /* Two lines of IPv6 need a taller slot than one line of IPv4, and the slot is
+     shared so that switching can't move the toggle. That leaves IPv4 with slack
+     to sit in, and centring it splits the slack in two — half of it landing
+     between the address and its toggle, which is the one gap on the page that
+     is supposed to be tight. Aligned to the bottom, the whole surplus goes
+     above the address instead, where it is indistinguishable from the
+     whitespace already there, and both versions end up the same distance from
+     the control that switches them. */
+  .ip-display { align-items: flex-end; }
+
+  .ip-display[data-version="v6"] .ip-text {
+    flex-wrap: wrap;
+    row-gap: 0.08em;
+    /* The break point, enforced by geometry rather than by a hard break: the
+       line is just wide enough for the balanced half, so the group that would
+       start the second half is the first one that doesn't fit. Sits between
+       the half's own width and the full width available — above the former by
+       the slack fitted in above, and below the latter so the line can never
+       push past the button that holds it. */
+    max-width: calc(var(--adv6h, 9.4) * 1.015em);
+  }
+}
+
+/* No IPv6 to show — a failed lookup, or a v4-only network. The v6 tab then
+   draws a short word at the v4 size (see render()), so every v6 term above is
+   describing something that isn't there: left alone, a narrow viewport would
+   reserve two lines of height for a seven-character word and push the toggle
+   down to clear a gap nothing occupies. Outranks the media query on
+   specificity, so it holds at every width without needing to repeat itself. */
+.hero[data-v6="none"] {
+  --fs6: var(--fs4);
+  --lines6: 1;
 }
 
 /* ---- meta line ---- */
@@ -322,7 +499,9 @@ button { font: inherit; color: inherit; }
   align-self: stretch;
   margin: 20px 0 0;
   min-height: 1.2em;
-  font-size: clamp(11px, 1.6vw, 13px);
+  /* Floored at 12px rather than 11px: this row carries the only instruction on
+     the page, and on a phone it is the one a touch user actually needs. */
+  font-size: clamp(12px, 1.6vw, 13px);
   letter-spacing: 0.08em;
   color: var(--fg-muted);
   transition: color 180ms var(--ease);
@@ -379,6 +558,32 @@ button { font: inherit; color: inherit; }
 .meta[data-copied] .copy-hint {
   opacity: 0;
   transition-delay: 0s;
+}
+
+/* Which of the two hints is the true one. Only one is ever in the layout, so
+   the absolute positioning above can't stack them on each other. */
+.copy-hint-coarse { display: none; }
+
+@media (hover: none), (pointer: coarse) {
+  .copy-hint-fine { display: none; }
+  .copy-hint-coarse { display: block; }
+
+  /* --affordance never fires here: it is driven by hover, and there isn't any.
+     So the hint stands at rest instead of waiting to be revealed — without it
+     a touch user has no signal at all that the number is a button, and the
+     only way to find out is to tap it by accident. Held below full strength so
+     it stays a caption rather than competing with the address above it.
+     Gated on [data-copyable] for the same reason the hover version is: a dead
+     slot must not offer to copy, and `no IPv4` puts real text in this row that
+     the hint would otherwise sit on top of. Gated on :not([data-copied])
+     rather than left to the rule above, which this selector now outweighs:
+     a hint on how to do the thing that was just done is the one moment it's
+     noise, and it has to be gone while the row says "copied". */
+  .hero:has(.ip-display[data-copyable]) .meta:not([data-copied]) .copy-hint-coarse {
+    opacity: 0.75;
+    translate: none;
+    transition-delay: 0s;
+  }
 }
 
 /* ---- version toggle ---- */
@@ -450,9 +655,26 @@ button { font: inherit; color: inherit; }
   transition: color 160ms var(--ease);
 }
 
-.toggle-btn:hover:not(.is-active) { color: var(--fg-secondary); }
+/* Gated, because a touch browser leaves :hover stuck on the last thing tapped
+   — so switching to IPv6 left IPv4 sitting in its hover colour indefinitely,
+   a highlight on the option you did not choose. */
+@media (hover: hover) and (pointer: fine) {
+  .toggle-btn:hover:not(.is-active) { color: var(--fg-secondary); }
+}
 
 .toggle-btn.is-active { color: var(--bg); }
+
+/* A finger is not a cursor. At the desktop size the track is 30px tall, which
+   is a comfortable click and a miss-prone tap — below the ~44px both platform
+   guidelines ask for. The padding grows rather than the type, so the control
+   keeps its proportions and only its hit area changes; the label goes up one
+   pixel because 11px is a squint at arm's length. */
+@media (pointer: coarse) {
+  .toggle-btn {
+    padding: 12px 22px;
+    font-size: 12px;
+  }
+}
 
 /* Failed lookup: there's no second answer to switch to. Marked with
    `aria-disabled` rather than `disabled` (see setToggleEnabled), so it keeps
@@ -471,13 +693,18 @@ button { font: inherit; color: inherit; }
 /* ---- curl hint ---- */
 /* Fixed to the viewport so it costs the hero nothing. Sits at 0.45 opacity —
    present enough to be found by anyone who looks for it, quiet enough that the
-   page still reads as one number on a field. */
+   page still reads as one number on a field.
+   Pinned at 0 and padded rather than offset with `bottom`, so the home
+   indicator on a notched device pushes the hint up instead of sitting under it.
+   A hybrid machine — an iPad with a trackpad, a Surface — reports hover, so
+   this hint is not reliably desktop-only and does have to clear the inset. */
 .curl {
   position: fixed;
-  bottom: 18px;
+  bottom: 0;
   left: 0;
   right: 0;
   margin: 0;
+  padding: 0 var(--gutter) calc(18px + env(safe-area-inset-bottom));
   text-align: center;
   font-size: 11px;
   letter-spacing: 0.06em;

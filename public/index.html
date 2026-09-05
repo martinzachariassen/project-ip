@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- `viewport-fit=cover` lets the page paint into the notch/home-indicator
+       area; every edge that holds content then pays it back through the
+       env(safe-area-inset-*) padding in style.css. Without it the browser
+       letterboxes the page and the background stops short of the corners. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <!-- script.js overwrites this with the address itself the moment the
        lookup lands, so what stands here is the loading state, the failure
        state, and the line that ends up in search results and bookmarks.
@@ -16,6 +20,12 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <!-- Mobile browser chrome (address bar, status bar) takes its colour from
+       here, so the page reads as edge-to-edge instead of a card floating in a
+       white toolbar. Hex, not oklch: these are the computed sRGB values of
+       --bg in each scheme, and the meta tag has no cascade to inherit from. -->
+  <meta name="theme-color" content="#ebeff2" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#151619" media="(prefers-color-scheme: dark)" />
   <link rel="preload" as="font" type="font/woff2" href="fonts/rajdhani-700.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="fonts/ibm-plex-mono-400.woff2" crossorigin />
   <link rel="stylesheet" href="style.css" />
@@ -46,7 +56,13 @@
            button's own label already says "Copy IP address …". -->
       <p id="meta" class="meta">
         <span id="meta-text" class="meta-text"></span>
-        <span class="copy-hint" aria-hidden="true">click to copy · or press C</span>
+        <span class="copy-hint copy-hint-fine" aria-hidden="true">click to copy · or press C</span>
+        <!-- A touch device has neither of the things the line above names: no
+             click, and no keyboard to press C on. It also has no hover, so
+             there is no gesture that could reveal a hint on demand — this one
+             is shown at rest instead (see .copy-hint), which is the only way a
+             phone ever learns the number is a button. -->
+        <span class="copy-hint copy-hint-coarse" aria-hidden="true">tap to copy</span>
       </p>
     </section>
 
