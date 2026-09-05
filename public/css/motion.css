@@ -1,0 +1,43 @@
+/* ---- reduced motion ---- */
+/* Gentler, not zero — colour still carries the meaning, only movement goes. */
+@media (prefers-reduced-motion: reduce) {
+  .ip-display {
+    transition-duration: 0.01ms;
+  }
+  .ip-display[data-copyable]:active {
+    transform: none;
+  }
+  .ip-text::after {
+    scale: 1 1;
+    transition: opacity 120ms var(--ease);
+  }
+  .copy-hint {
+    translate: none;
+    transition: opacity 120ms var(--ease);
+    transition-delay: calc(var(--affordance, 0) * 220ms);
+  }
+  .cell {
+    transition-duration: 60ms;
+    transition-delay: 0s;
+  }
+  .ip-display[data-copied] .cell {
+    transition-duration: 60ms;
+    transition-delay: 0s;
+  }
+  .meta-text,
+  .curl-label {
+    transition-duration: var(--ip-exit);
+  }
+  .meta.is-swapping .meta-text {
+    transform: none;
+  }
+  .curl-btn.is-swapping .curl-label {
+    transform: none;
+  }
+  .curl-btn:active .curl-label {
+    scale: 1;
+  }
+  .qr-panel {
+    transition-duration: 0.01ms;
+  }
+}

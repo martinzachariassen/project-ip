@@ -1,0 +1,217 @@
+/* ---- panel ---- */
+/* cqw, not vw: vw counts the scrollbar gutter, so a width budget fitted to
+   "100vw minus margins" overflows by exactly the scrollbar on desktop. */
+.panel {
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ---- hero ---- */
+/* Type is fitted to the address's actual width rather than a fixed vw ramp:
+   script.js measures how many ems wide the value is (--adv4/--adv6/--adv6h,
+   see measureAdvances) and CSS divides the available width by that, so both
+   a short IPv4 and a long IPv6 land at the largest size that fits. */
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  /* Stretched to the panel, not shrink-wrapped to the address — the meta
+     row below needs room for its longest status line. */
+  align-self: stretch;
+
+  --ip-pad: 4px;
+  --ip-pad-x: 8px;
+  --ip-avail: calc(100cqw - 2 * var(--ip-pad-x));
+
+  /* Two ceilings: --cap-w keeps type in proportion on a wide screen,
+     --cap-h keeps it in proportion on a short one (landscape phone). */
+  --cap-w: clamp(2rem, 14cqw, 8.5rem);
+  --cap-h: 26svh;
+  --cap: min(var(--cap-w), var(--cap-h));
+
+  /* IPv6 gets a lower ceiling — fitted to width alone, 39 characters at
+     900px would read as a banner rather than a value. */
+  --cap6: min(var(--cap), 3.5rem);
+
+  --fs4: min(var(--cap), calc(var(--ip-avail) / var(--adv4, 7)));
+  --fs6: min(var(--cap6), calc(var(--ip-avail) / var(--adv6, 18.6)));
+
+  /* Overridden to two lines on narrow viewports; see the wrap rule below. */
+  --lines6: 1;
+
+  /* The reserved slot, sized to whichever family this visit has (a single
+     connection only ever shows one). */
+  --ip-slot: var(--fs4);
+}
+
+.hero[data-v6="address"] {
+  --ip-slot: calc(var(--fs6) * var(--lines6));
+}
+
+.ip-display {
+  /* `height`, not `min-height`, which would exclude the padding and leave
+     v4 taller than v6, shifting the centred layout. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  height: calc(var(--ip-slot) + 2 * var(--ip-pad));
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: "Rajdhani", var(--font-mono);
+  font-weight: 700;
+  font-size: var(--fs4);
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  color: var(--fg);
+  padding: var(--ip-pad) var(--ip-pad-x);
+  border-radius: 4px;
+  line-height: 1;
+  white-space: nowrap;
+  transition: transform 160ms var(--ease);
+}
+
+.ip-display[data-copyable]:active {
+  transform: scale(0.985);
+}
+
+/* ---- affordance: hover and keyboard focus ---- */
+/* One switch, --affordance, set on .hero (a shared ancestor, since custom
+   properties only travel down) so hover, the rail, and the copy hint stay
+   in sync while each keeps its own transition.
+   `[data-copyable]` is the whole gate — the failed-lookup placeholder isn't
+   a button and must not light up or offer to copy. */
+@media (hover: hover) and (pointer: fine) {
+  .hero:has(.ip-display[data-copyable]:hover) {
+    --affordance: 1;
+  }
+}
+.hero:has(.ip-display[data-copyable]:focus-visible) {
+  --affordance: 1;
+}
+
+/* Separators light up on hover, not the digits — those are reserved for the
+   copy-confirmation wash, which needs somewhere left to go. */
+.ip-display[data-copyable] .cell.sep {
+  color: color-mix(
+    in oklch,
+    var(--fg),
+    var(--accent-deep) calc(var(--affordance, 0) * 100%)
+  );
+}
+
+/* A rail draws itself under the value on hover, anchored in `em` so it sits
+   the same optical distance below both type sizes. The ends fade rather
+   than stop hard, so it reads as light under the digits, not an underline. */
+.ip-text::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% - 0.16em);
+  height: max(1.5px, 0.019em);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent-deep) 10%,
+    var(--accent-deep) 90%,
+    transparent
+  );
+  opacity: var(--affordance, 0);
+  scale: calc(0.35 + 0.65 * var(--affordance, 0)) 1;
+  transition:
+    opacity 200ms var(--ease),
+    scale 420ms var(--ease-expo);
+}
+
+.ip-text {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  position: relative; /* containing block for the hover rail */
+}
+
+/* One hextet/octet plus its separator, kept together so a wrap can't land
+   mid-group. */
+.group {
+  display: inline-flex;
+  white-space: nowrap;
+}
+
+/* 1ch == advance width of "0", pinning digits to a fixed column whether or
+   not Rajdhani ships the `tnum` feature. */
+.cell {
+  display: inline-block;
+  width: 1ch;
+  text-align: center;
+  transition: color 140ms var(--ease);
+  transition-delay: calc(var(--i) * 8ms);
+}
+.cell.sep {
+  width: auto;
+  transition-delay: 0s;
+}
+
+.cell.is-scrambling {
+  color: var(--fg-muted);
+  opacity: 0.55;
+  transition:
+    color 120ms var(--ease),
+    opacity 120ms var(--ease);
+  transition-delay: 0s;
+}
+
+/* ---- copy confirmation ---- */
+/* Attribute-driven, not a keyframe restart, so rapid clicks retarget the
+   scanline mid-flight instead of breaking it. */
+.ip-display[data-copied] .cell {
+  color: var(--accent-deep);
+  transition: color 180ms var(--ease-expo);
+  transition-delay: calc(var(--i) * 12ms);
+}
+
+/* ---- failure state ---- */
+.ip-display.is-failed {
+  cursor: default;
+  color: var(--fg-muted);
+}
+.ip-display.is-failed .cell {
+  opacity: 0.45;
+}
+
+.ip-display[data-version="v6"] {
+  font-size: var(--fs6);
+  letter-spacing: 0.01em;
+}
+
+/* ---- IPv6 on a narrow screen ---- */
+/* A full IPv6 fitted to one line on a 375px phone lands at ~18px — legible,
+   but body-copy size for the page's one purpose. Broken across two lines
+   the same address fits at nearly double that. Opt-in (rather than a
+   default wrap) because a free-to-wrap flex line would also break at 900px,
+   which is a bug, not a layout. */
+@media (max-width: 480px) {
+  .hero {
+    /* twoLineAdvance (script.js) picks the split that balances both lines.
+       The extra 2% absorbs subpixel rounding that would otherwise push the
+       fourth group onto a third, ragged line. */
+    --fs6: min(var(--cap6), calc(var(--ip-avail) / var(--adv6h, 9.4) / 1.02));
+    --lines6: 2.08;
+  }
+
+  .ip-display[data-version="v6"] .ip-text {
+    flex-wrap: wrap;
+    row-gap: 0.08em;
+    /* Geometry, not a hard break: the line is exactly wide enough for the
+       balanced half, so the next group is the first that doesn't fit. */
+    max-width: calc(var(--adv6h, 9.4) * 1.015em);
+  }
+}

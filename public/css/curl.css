@@ -1,0 +1,80 @@
+/* ---- curl hint ---- */
+/* Fixed to the viewport so it costs the hero nothing. Padded rather than
+   offset with `bottom`, so the home indicator on a notched device pushes it
+   up instead of sitting under it — a hybrid device (iPad + trackpad) can
+   report hover, so this isn't reliably desktop-only. */
+.curl {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0 var(--gutter) calc(18px + env(safe-area-inset-bottom));
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.curl-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: inherit;
+  letter-spacing: inherit;
+  color: var(--fg-muted);
+  opacity: 0.45;
+  transition:
+    opacity 160ms var(--ease),
+    color 160ms var(--ease);
+}
+
+.curl-btn:hover,
+.curl-btn:focus-visible {
+  opacity: 1;
+  color: var(--fg-secondary);
+}
+
+.curl-btn:active .curl-label {
+  scale: 0.96;
+}
+
+.curl-btn[data-copied] {
+  opacity: 1;
+  color: var(--accent-deep);
+}
+
+/* The label swaps to the word itself rather than relying on the colour
+   shift alone, which barely reads while the button is already at full
+   hover opacity. Shares the meta line's exit timing. */
+.curl-label {
+  display: inline-block;
+  transition:
+    opacity 220ms var(--ease-expo),
+    transform 220ms var(--ease-expo),
+    scale 120ms var(--ease);
+}
+
+.curl-btn.is-swapping .curl-label {
+  opacity: 0;
+  transform: translateY(2px);
+  transition-duration: var(--ip-exit);
+  transition-timing-function: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* No hover to reveal it, no shell to paste into. */
+@media (hover: none) {
+  .curl {
+    display: none;
+  }
+}
+
+/* Would collide with the address/meta block on a short viewport. */
+@media (max-height: 380px) {
+  .curl {
+    display: none;
+  }
+}

@@ -110,7 +110,7 @@ jobs:
 
           # Favicon has a stable URL, so it must not be immutable (200 checked
           # first so a missing/renamed file can't pass this vacuously).
-          favicon="$base/favicon.svg"
+          favicon="$base/assets/icons/favicon.svg"
           if [ "$(curl -s -o /dev/null -w '%{http_code}' "$favicon")" != "200" ]; then
             bad "favicon is not served (cannot check its cache policy)"
           elif headers "$favicon" | grep -qi '^cache-control:.*immutable'; then

@@ -1,0 +1,85 @@
+/* ---- meta line ---- */
+/* Does double duty: geo/ISP context at rest, copy confirmation on demand —
+   the only spare text slot on the page, so reusing it beats a toast.
+   min-height reserves the row so neither job shifts the layout. */
+.meta {
+  position: relative; /* the hover hint stacks on the row, not in it */
+  align-self: stretch;
+  margin: 20px 0 0;
+  min-height: 1.2em;
+  font-size: clamp(12px, 1.6vw, 13px);
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+  transition: color 180ms var(--ease);
+}
+
+.meta[data-copied] {
+  color: var(--accent-deep);
+}
+
+/* Shares --ip-exit with the IP value so the two read as one object
+   changing, not two elements animating near each other. */
+.meta-text {
+  display: inline-block;
+  transition:
+    opacity 220ms var(--ease-expo),
+    transform 220ms var(--ease-expo);
+}
+
+.meta.is-swapping .meta-text {
+  opacity: 0;
+  transform: translateY(2px);
+  transition-duration: var(--ip-exit);
+  transition-timing-function: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* Out of flow and pinned across the row so the hint's width can never nudge
+   the status text off centre. `[data-copyable]` guarantees the row is
+   otherwise empty, so the two never collide.
+   The delay only applies coming in — a pointer passing through leaves
+   before ever being offered anything, but the exit has to be instant or it
+   reads as answering the click that dismissed it. */
+.copy-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: var(--affordance, 0);
+  translate: 0 calc((1 - var(--affordance, 0)) * 3px);
+  transition:
+    opacity 200ms var(--ease),
+    translate 320ms var(--ease-expo);
+  transition-delay: calc(var(--affordance, 0) * 220ms);
+}
+
+.meta[data-copied] .copy-hint {
+  opacity: 0;
+  transition-delay: 0s;
+}
+
+/* Only relevant on a device with no hover/keyboard — the meta line carries
+   the shortcuts there instead. */
+.copy-hint-coarse {
+  display: none;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .copy-hint-coarse {
+    display: block;
+  }
+
+  /* No hover to reveal this, so it stands at rest instead. */
+  .hero:has(.ip-display[data-copyable])
+    .meta:not([data-copied])
+    .copy-hint-coarse {
+    opacity: 0.75;
+    translate: none;
+    transition-delay: 0s;
+  }
+
+  .hero:has(.ip-display[data-copyable]) .meta:not([data-copied]) .meta-text {
+    opacity: 0;
+  }
+}

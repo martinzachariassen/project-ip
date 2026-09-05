@@ -7,10 +7,10 @@
   },
   "files": {
     "includes": [
-      "public/*.js",
-      "public/*.css",
+      "public/js/**/*.js",
+      "public/css/**/*.css",
       "functions/*.js",
-      "!public/qrcode.js"
+      "!public/js/vendor"
     ]
   },
   "formatter": {

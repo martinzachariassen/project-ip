@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>what is my ip · ip.mlz.no</title>
   <meta name="description" content="Your public IP address — clean and fast." />
-  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png" />
-  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="assets/icons/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
   <meta name="theme-color" content="#ebeff2" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#151619" media="(prefers-color-scheme: dark)" />
-  <link rel="preload" as="font" type="font/woff2" href="fonts/rajdhani-700.woff2" crossorigin />
-  <link rel="preload" as="font" type="font/woff2" href="fonts/ibm-plex-mono-400.woff2" crossorigin />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="preload" as="font" type="font/woff2" href="assets/fonts/rajdhani-700.woff2" crossorigin />
+  <link rel="preload" as="font" type="font/woff2" href="assets/fonts/ibm-plex-mono-400.woff2" crossorigin />
+  <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <main class="panel">
@@ -46,7 +46,7 @@
     <p class="meta">JavaScript is required to look up your IP address.</p>
   </noscript>
 
-  <script src="qrcode.js"></script>
-  <script src="script.js"></script>
+  <script src="js/vendor/qrcode.js"></script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
