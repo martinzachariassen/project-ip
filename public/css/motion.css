@@ -37,7 +37,4 @@
   .curl-btn:active .curl-label {
     scale: 1;
   }
-  .qr-panel {
-    transition-duration: 0.01ms;
-  }
 }

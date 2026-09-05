@@ -1,5 +1,4 @@
 import { copyText } from "./clipboard.js";
-import { renderQR } from "./qr.js";
 import { buildCells, groupCells, scramble } from "./scramble.js";
 
 const PLACEHOLDER_IP = {
@@ -13,7 +12,7 @@ const params = new URLSearchParams(location.search);
 // connection only ever tells you the one it came in on.
 let DATA = { ip: "" };
 let family = "v4";
-const SHORTCUT_HINT = "press C to copy plain · R for CIDR · Q for a QR code";
+const SHORTCUT_HINT = "press C to copy plain · R for CIDR";
 
 // Dev-only shortcuts for exercising the v6 layout and the failure state
 // without needing real dual-stack routing.
@@ -37,10 +36,8 @@ const metaText = document.getElementById("meta-text");
 const statusEl = document.getElementById("status");
 const curlBtn = document.getElementById("curl");
 const curlLabel = document.getElementById("curl-label");
-const qrPanel = document.getElementById("qr-panel");
-const qrPlate = document.getElementById("qr-plate");
 
-const state = { failed: false, copyable: false, meta: "", qrOpen: false };
+const state = { failed: false, copyable: false, meta: "" };
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -122,14 +119,6 @@ function copyCIDR() {
 }
 
 ipBtn.addEventListener("click", copyIP);
-
-function setQR(open) {
-  if (!state.copyable) return;
-  state.qrOpen = open;
-  qrPanel.dataset.open = String(open);
-  qrPanel.setAttribute("aria-hidden", String(!open));
-  if (open) renderQR(qrPlate, DATA.ip);
-}
 
 const CURL_CMD = curlLabel?.textContent.trim() ?? "";
 
@@ -275,9 +264,6 @@ document.addEventListener("keydown", (e) => {
   } else if (key === "r") {
     e.preventDefault();
     copyCIDR();
-  } else if (key === "q") {
-    e.preventDefault();
-    setQR(!state.qrOpen);
   }
 });
 

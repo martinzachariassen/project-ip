@@ -9,8 +9,7 @@
     "includes": [
       "public/js/**/*.js",
       "public/css/**/*.css",
-      "functions/*.js",
-      "!public/js/vendor"
+      "functions/*.js"
     ]
   },
   "formatter": {
