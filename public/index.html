@@ -2,28 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <!-- `viewport-fit=cover` lets the page paint into the notch/home-indicator
-       area; every edge that holds content then pays it back through the
-       env(safe-area-inset-*) padding in style.css. Without it the browser
-       letterboxes the page and the background stops short of the corners. -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <!-- script.js overwrites this with the address itself the moment the
-       lookup lands, so what stands here is the loading state, the failure
-       state, and the line that ends up in search results and bookmarks.
-       Keyword first because a tab strip truncates and search does not. -->
   <title>what is my ip · ip.mlz.no</title>
   <meta name="description" content="Your public IP address — clean and fast." />
-  <!-- The SVG carries its own prefers-color-scheme block, so the tile
-       inverts with the browser theme and keeps contrast against either
-       tab strip. The PNG is the fallback for browsers that ignore an SVG
-       icon; it is the dark tile unconditionally, which reads on both. -->
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <!-- Mobile browser chrome (address bar, status bar) takes its colour from
-       here, so the page reads as edge-to-edge instead of a card floating in a
-       white toolbar. Hex, not oklch: these are the computed sRGB values of
-       --bg in each scheme, and the meta tag has no cascade to inherit from. -->
   <meta name="theme-color" content="#ebeff2" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#151619" media="(prefers-color-scheme: dark)" />
   <link rel="preload" as="font" type="font/woff2" href="fonts/rajdhani-700.woff2" crossorigin />
@@ -44,24 +28,9 @@
         <button type="button" class="toggle-btn" data-version="v6" aria-pressed="false">IPv6</button>
       </div>
 
-      <!-- Below the control, not above it: this slot is empty at rest, and a
-           reserved blank row between the IP and its toggle just pushed the two
-           apart. As a status line it also belongs after the thing it reports on.
-
-           The hint replaces the native `title` tooltip the IP used to carry: it
-           lands in a row the layout already reserves, appears the moment the
-           pointer arrives instead of a second later, and is the same voice as
-           the "copied to clipboard" it precedes. Absolutely positioned so it
-           can never push the status text off centre; aria-hidden because the
-           button's own label already says "Copy IP address …". -->
       <p id="meta" class="meta">
         <span id="meta-text" class="meta-text"></span>
         <span class="copy-hint copy-hint-fine" aria-hidden="true">click to copy · or press C</span>
-        <!-- A touch device has neither of the things the line above names: no
-             click, and no keyboard to press C on. It also has no hover, so
-             there is no gesture that could reveal a hint on demand — this one
-             is shown at rest instead (see .copy-hint), which is the only way a
-             phone ever learns the number is a button. -->
         <span class="copy-hint copy-hint-coarse" aria-hidden="true">tap to copy</span>
       </p>
     </section>
@@ -69,9 +38,6 @@
     <p id="status" class="sr-only" role="status" aria-atomic="true"></p>
   </main>
 
-  <!-- Pinned to the viewport, not appended to the panel, so it can't nudge the
-       hero off centre. Hidden on touch: no hover to reveal it, no shell to
-       paste into. -->
   <footer class="curl">
     <button id="curl" class="curl-btn" type="button" title="Copy the command">
       <span id="curl-label" class="curl-label">curl ip.mlz.no</span>
