@@ -3,9 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>what is my ip</title>
+  <!-- script.js overwrites this with the address itself the moment the
+       lookup lands, so what stands here is the loading state, the failure
+       state, and the line that ends up in search results and bookmarks.
+       Keyword first because a tab strip truncates and search does not. -->
+  <title>what is my ip · ip.mlz.no</title>
   <meta name="description" content="Your public IP address — clean and fast." />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%23111'/><circle cx='8' cy='8' r='2.5' fill='%23a78bfa'/></svg>" />
+  <!-- The SVG carries its own prefers-color-scheme block, so the tile
+       inverts with the browser theme and keeps contrast against either
+       tab strip. The PNG is the fallback for browsers that ignore an SVG
+       icon; it is the dark tile unconditionally, which reads on both. -->
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="preload" as="font" type="font/woff2" href="fonts/rajdhani-700.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="fonts/ibm-plex-mono-400.woff2" crossorigin />
   <link rel="stylesheet" href="style.css" />

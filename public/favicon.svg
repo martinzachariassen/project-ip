@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- mlz crown mark. The tile flips with the browser theme so the icon keeps
+       its contrast against both a light and a dark tab strip. -->
+  <style>
+    .tile { fill: #101214 }
+    .mark { fill: #ebeff2 }
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: #e9ebef }
+      .mark { fill: #151619 }
+    }
+  </style>
+  <rect x="1" y="1" width="30" height="30" rx="6" class="tile"/>
+  <polygon points="7,25 7,7 11.5,7 16,18.5 20.5,7 25,7 25,25" class="mark"/>
+</svg>
