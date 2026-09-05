@@ -1,14 +1,21 @@
 (() => {
   "use strict";
 
-  const DATA = {
-    v4: { ip: "84.212.19.77" },
-    v6: { ip: "2a01:79c:cebd:8e40:1c2b:9f3a:44de:1" },
+  const PLACEHOLDER_IP = {
+    v4: "84.212.19.77",
+    v6: "2a01:79c:cebd:8e40:1c2b:9f3a:44de:1",
   };
 
   const params = new URLSearchParams(location.search);
-  if (params.has("nov4")) DATA.v4 = null;
-  if (params.has("nov6")) DATA.v6 = null;
+
+  // Dev-only: force the IPv6 placeholder locally. There's no way to reach the
+  // v6 path naturally on a network without IPv6 (curl -6 doesn't route here).
+  const DATA = { ip: PLACEHOLDER_IP[params.has("v6") ? "v6" : "v4"] };
+
+  // The family is read off the address itself, not chosen — a single
+  // connection only ever tells you the one it came in on.
+  const family = DATA.ip.includes(":") ? "v6" : "v4";
+  const FAMILY_LABEL = { v4: "IPv4", v6: "IPv6" };
 
   const DIGITS = "0123456789";
   const HEX = "0123456789abcdef";
@@ -39,14 +46,6 @@
       span.textContent = ch;
       return span;
     });
-  }
-
-  function buildWordCell(text) {
-    const span = document.createElement("span");
-    span.className = "cell word";
-    span.style.setProperty("--i", 0);
-    span.textContent = text;
-    return span;
   }
 
   function scramble(el, target, opts = {}) {
@@ -141,12 +140,10 @@
   const metaEl = document.getElementById("meta");
   const metaText = document.getElementById("meta-text");
   const statusEl = document.getElementById("status");
-  const toggleEl = document.querySelector(".toggle");
-  const toggleBtns = [...document.querySelectorAll(".toggle-btn")];
   const curlBtn = document.getElementById("curl");
   const curlLabel = document.getElementById("curl-label");
 
-  const state = { version: "v4", failed: false, copyable: false, meta: "" };
+  const state = { failed: false, copyable: false, meta: "" };
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -160,7 +157,7 @@
     if (e.detail > 0) e.currentTarget.blur();
   }
 
-  [ipBtn, curlBtn, ...toggleBtns].forEach((btn) =>
+  [ipBtn, curlBtn].forEach((btn) =>
     btn?.addEventListener("click", dropPointerFocus),
   );
 
@@ -227,7 +224,7 @@
 
   async function copyIP() {
     if (!state.copyable) return;
-    const ip = DATA[state.version].ip;
+    const { ip } = DATA;
 
     ipBtn.dataset.copied = "";
     clearTimeout(copyTimer);
@@ -275,42 +272,7 @@
       v4: { duration: 900, charDuration: 380 },
       v6: { duration: 1200, charDuration: 260 },
     },
-    switch: {
-      v4: { duration: 520, charDuration: 240, hold: 0 },
-      v6: { duration: 680, charDuration: 180, hold: 0 },
-    },
   };
-
-  function setToggle(version) {
-    toggleEl.dataset.version = version;
-    toggleBtns.forEach((btn) => {
-      const active = btn.dataset.version === version;
-      btn.classList.toggle("is-active", active);
-      btn.setAttribute("aria-pressed", String(active));
-    });
-  }
-
-  function setToggleEnabled(enabled) {
-    toggleEl.classList.toggle("is-disabled", !enabled);
-    toggleBtns.forEach((btn) => btn.setAttribute("aria-disabled", String(!enabled)));
-  }
-
-  const STATIC = { duration: 0, hold: 0, charDuration: 0 };
-
-  const EMPTY = {
-    v4: { word: "no IPv4", label: "No IPv4 address on this network", other: "v6" },
-    v6: { word: "no IPv6", label: "No IPv6 address on this network", other: "v4" },
-  };
-
-  function emptyMeta(empty) {
-    const cause = DATA[empty.other] ? `${empty.other}-only network` : "no address either way";
-    return `${cause} · nothing to copy`;
-  }
-
-  function setWord(el, text) {
-    cancelAnimationFrame(el._scrambleRAF);
-    el.replaceChildren(...groupCells([buildWordCell(text)]));
-  }
 
   const heroEl = document.querySelector(".hero");
 
@@ -329,14 +291,13 @@
   rulerBox.appendChild(ruler);
   heroEl.appendChild(rulerBox);
 
-  function advanceOf(version, cells) {
-    rulerBox.dataset.version = version;
+  function advanceOf(family, cells) {
+    rulerBox.dataset.version = family;
     ruler.replaceChildren(...groupCells(cells));
     return ruler.getBoundingClientRect().width / RULER_PX;
   }
 
-  const gridAdvance = (text, version) => advanceOf(version, buildCells(text));
-  const wordAdvance = (text) => advanceOf("v4", [buildWordCell(text)]);
+  const gridAdvance = (text, family) => advanceOf(family, buildCells(text));
 
   function twoLineAdvance(ip) {
     const parts = ip.split(":");
@@ -353,30 +314,25 @@
     return best;
   }
 
-  function shownValue(version) {
-    if (state.failed) return { text: "0.0.0.0", size: "v4" };
-    const entry = DATA[version];
-    return entry
-      ? { text: entry.ip, size: version }
-      : { text: EMPTY[version].word, size: "word" };
+  function shownValue() {
+    return state.failed
+      ? { text: "0.0.0.0", size: "v4" }
+      : { text: DATA.ip, size: family };
   }
 
   function measureAdvances() {
-    const advance = (v) =>
-      v.size === "word" ? wordAdvance(v.text) : gridAdvance(v.text, v.size);
+    const value = shownValue();
+    const advance = gridAdvance(value.text, value.size);
+    const showingV6 = value.size === "v6";
 
-    const sized6 = !state.failed && !!DATA.v6;
-    const atV4 = [advance(shownValue("v4"))];
-    if (!sized6) atV4.push(advance(shownValue("v6")));
+    const set = (name, val) => heroEl.style.setProperty(name, val.toFixed(4));
 
-    const set = (name, value) => heroEl.style.setProperty(name, value.toFixed(4));
-    set("--adv4", Math.max(...atV4));
-
-    heroEl.dataset.v6 = sized6 ? "address" : "none";
-    if (sized6) {
-      set("--adv6", advance(shownValue("v6")));
-      set("--adv6h", twoLineAdvance(DATA.v6.ip));
+    heroEl.dataset.v6 = showingV6 ? "address" : "none";
+    if (showingV6) {
+      set("--adv6", advance);
+      set("--adv6h", twoLineAdvance(value.text));
     } else {
+      set("--adv4", advance);
       heroEl.style.removeProperty("--adv6");
       heroEl.style.removeProperty("--adv6h");
     }
@@ -384,40 +340,13 @@
 
   document.fonts?.ready.then(measureAdvances);
 
-  function render(version, { animate = true, fast = false } = {}) {
-    const entry = DATA[version];
-    state.version = version;
-
-    ipBtn.classList.remove("is-failed", "is-empty");
-    setToggle(version);
-    setToggleEnabled(true);
-
-    if (!entry) {
-      const empty = EMPTY[version];
-      setCopyable(false);
-      ipBtn.dataset.version = "v4";
-      ipBtn.classList.add("is-empty");
-      ipLabel.textContent = empty.label;
-      setMeta(emptyMeta(empty));
-      setWord(ipText, empty.word);
-      if (fast) announce(empty.label);
-      return;
-    }
-
-    const { ip } = entry;
+  function render() {
+    const { ip } = DATA;
     setCopyable(true);
-    ipBtn.dataset.version = version;
+    ipBtn.dataset.version = family;
     ipLabel.textContent = `Copy IP address ${ip}`;
-    setMeta("");
-
-    if (fast) announce(ip);
-
-    if (!animate) {
-      scramble(ipText, ip, STATIC);
-      return;
-    }
-
-    scramble(ipText, ip, TIMING[fast ? "switch" : "boot"][version]);
+    setMeta(FAMILY_LABEL[family]);
+    scramble(ipText, ip, TIMING.boot[family]);
   }
 
   function renderFailure() {
@@ -427,7 +356,6 @@
     ipBtn.classList.add("is-failed");
     ipBtn.dataset.version = "v4";
     ipLabel.textContent = "IP address unavailable";
-    setToggleEnabled(false);
     setMeta("no route · can't see you from here");
     scramble(ipText, "0.0.0.0", { perpetual: true });
     announce("Could not determine your IP address");
@@ -435,33 +363,6 @@
 
   const EXIT_MS =
     parseFloat(getComputedStyle(ipBtn).getPropertyValue("--ip-exit")) || 0;
-
-  let switchToken = 0;
-
-  async function switchTo(version) {
-    const token = ++switchToken;
-
-    ipBtn.classList.add("is-switching");
-    metaEl.classList.add("is-swapping");
-    await wait(EXIT_MS);
-    if (token !== switchToken) return;
-
-    render(version, { fast: true });
-    ipBtn.classList.remove("is-switching");
-    metaEl.classList.remove("is-swapping");
-  }
-
-  function selectVersion(next) {
-    if (state.failed || next === state.version) return;
-
-    state.version = next;
-    setToggle(next);
-    switchTo(next);
-  }
-
-  toggleBtns.forEach((btn) => {
-    btn.addEventListener("click", () => selectVersion(btn.dataset.version));
-  });
 
   document.addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -471,13 +372,9 @@
       return;
     }
 
-    const key = e.key.toLowerCase();
-    if (key === "c") {
+    if (e.key.toLowerCase() === "c") {
       e.preventDefault();
       copyIP();
-    } else if (key === "v") {
-      e.preventDefault();
-      selectVersion(state.version === "v4" ? "v6" : "v4");
     }
   });
 
@@ -485,7 +382,6 @@
     renderFailure();
   } else {
     measureAdvances();
-    const missing = ["v4", "v6"].find((v) => !DATA[v]);
-    render(missing ?? "v4");
+    render();
   }
 })();

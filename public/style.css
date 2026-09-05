@@ -160,10 +160,8 @@ button {
 }
 
 /* ---- hero ---- */
-/* Column, not just centred text: the IP and the toggle are both inline-level
-   boxes, so in a plain text flow they share a line and sit side by side. Each
-   needs its own row — the toggle reads as a control *for* the value above it,
-   not as something next to it.
+/* Column, not row: the address and the meta line beneath it are a stack, not
+   things that sit side by side.
 
    The custom properties on it are how the address gets its size.
    The old rule was `font-size: clamp(1.6rem, 9vw, 8rem)`, and a plain vw ramp
@@ -187,8 +185,8 @@ button {
   text-align: center;
   /* Full panel width rather than shrink-wrapped to the address. The meta row
      stretches to the hero (see .meta), so a shrink-wrapped hero handed the
-     longest status line — "v4-only network · nothing to copy" — a box the width
-     of a seven-character word to fit in. Everything inside stays centred; only
+     longest status line — "no route · can't see you from here" — a box the
+     width of a few words to fit in. Everything inside stays centred; only
      the room available to a line of text changes. */
   align-self: stretch;
 
@@ -201,7 +199,7 @@ button {
      --cap-w keeps the type in proportion to the panel on a wide monitor;
      --cap-h keeps it in proportion to a short one, which is the landscape
      phone case — 640px of width and 375px of height would otherwise produce a
-     number tall enough to push its own toggle off the bottom. */
+     number tall enough to push its own meta line off the bottom. */
   --cap-w: clamp(2rem, 14cqw, 8.5rem);
   --cap-h: 26svh;
   --cap: min(var(--cap-w), var(--cap-h));
@@ -218,21 +216,27 @@ button {
      to two lines on a narrow viewport; see the wrap rule further down. */
   --lines6: 1;
 
-  /* One reserved slot, tall enough for whichever version needs more, so
-     switching between them can't move the toggle under the finger that just
-     pressed it. Both terms are known up front because script.js measures both
-     versions on every render, not just the one on screen. */
-  --ip-slot: max(var(--fs4), calc(var(--fs6) * var(--lines6)));
+  /* The reserved slot, sized to whichever family this visit actually has —
+     see the [data-v6] override below. Defaults to the v4/failure height;
+     script.js only ever measures the one family it's showing (--adv4/--adv6
+     above), so there's no second term here to fall back to. */
+  --ip-slot: var(--fs4);
+}
+
+/* IPv6 is the family this visit has: the slot is the (possibly two-line)
+   v6 block instead, not a max of both — there is no other family to also
+   fit, since a single connection only ever shows one. */
+.hero[data-v6="address"] {
+  --ip-slot: calc(var(--fs6) * var(--lines6));
 }
 
 .ip-display {
-  /* The box is a fixed slot (--ip-slot), padding included (see --ip-pad).
-     Whichever version is showing sits inside it, so switching versions can't
-     change the hero's height — nothing on the page moves. `height`, not
+  /* The box is a fixed slot (--ip-slot), padding included (see --ip-pad),
+     sized to whichever family this visit actually has. `height`, not
      `min-height`: min-height excluded the padding, which left v4 8px taller
      than v6 and shifted the whole centred layout. (Where the value sits in the
      slot is `align-items`, which the narrow-screen rule further down changes
-     once two-line IPv6 makes the slot taller than IPv4 needs.) */
+     once two-line IPv6 makes the slot taller than one line needs.) */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -267,8 +271,9 @@ button {
    sibling of the button being hovered — custom properties only travel down.
    Unregistered, so the flip itself is discrete: the animation comes from the
    transitions on the properties that read it, which is exactly what we want.
-   `[data-copyable]` is the whole gate. `no IPv4` is not a button, and a slot
-   with nothing in it must not light up, promise a rail, or offer to copy. */
+   `[data-copyable]` is the whole gate. The failed-lookup placeholder isn't a
+   button, and a dead slot must not light up, promise a rail, or offer to
+   copy. */
 @media (hover: hover) and (pointer: fine) {
   .hero:has(.ip-display[data-copyable]:hover) { --affordance: 1; }
 }
@@ -317,14 +322,6 @@ button {
     scale 420ms var(--ease-expo);
 }
 
-/* ---- version switch ---- */
-/* A focus pull, not a slide: the old value defocuses and drops away, the new
-   one sharpens back in while the scramble churns. The font-size change between
-   v4 and v6 happens at opacity 0, so it's never seen as a snap.
-   Base rule = the entrance (expo, settles early). .is-switching = the exit
-   (short, accelerating — it should feel like it's leaving, not easing out).
-   Blur is in `em` so it tracks the type size: the same optical amount of
-   defocus on a 128px IPv4 and a 13px IPv6. */
 .ip-text {
   display: inline-flex;
   /* Never by default — only the narrow-screen IPv6 rule opts in, and it brings
@@ -332,18 +329,6 @@ button {
   flex-wrap: nowrap;
   justify-content: center;
   position: relative; /* containing block for the hover rail */
-  transition:
-    opacity 220ms var(--ease-expo),
-    transform 220ms var(--ease-expo),
-    filter 220ms var(--ease-expo);
-}
-
-.ip-display.is-switching .ip-text {
-  opacity: 0;
-  transform: scale(0.96);
-  filter: blur(0.05em);
-  transition-duration: var(--ip-exit);
-  transition-timing-function: cubic-bezier(0.4, 0, 1, 1);
 }
 
 /* One hextet or octet and the separator that follows it, kept together. The
@@ -371,16 +356,6 @@ button {
   transition-delay: 0s;
 }
 
-/* The empty state puts a word in the slot instead of an address. 1ch is the
-   advance of "0" — right for digits, but it stacks "no IPv6" into a smear —
-   so the word opts out of the column grid and keeps natural advances. Still a
-   `.cell`, so the dimming that marks a dead slot still finds it. */
-.cell.word {
-  width: auto;
-  letter-spacing: 0.02em;
-  transition-delay: 0s;
-}
-
 /* In-flight glyphs sit back; locking in "ignites" them over 120ms. */
 .cell.is-scrambling {
   color: var(--fg-muted);
@@ -402,17 +377,13 @@ button {
 }
 
 /* ---- failure state ---- */
-/* Two different nothings, styled the same because they read the same:
-   `.is-failed` = we couldn't find out, `.is-empty` = we found out, and the
-   answer is that there is no address. Both are dead slots — not clickable,
-   not copyable, visibly inert. */
-.ip-display.is-failed,
-.ip-display.is-empty {
+/* Couldn't find out. A dead slot — not clickable, not copyable, visibly
+   inert. */
+.ip-display.is-failed {
   cursor: default;
   color: var(--fg-muted);
 }
-.ip-display.is-failed .cell,
-.ip-display.is-empty .cell { opacity: 0.45; }
+.ip-display.is-failed .cell { opacity: 0.45; }
 
 /* IPv6 is up to 39 chars vs IPv4's 15 — needs its own fit or it overflows.
    Only the type shrinks; the slot height stays pinned to --ip-slot. */
@@ -449,16 +420,6 @@ button {
     --lines6: 2.08;
   }
 
-  /* Two lines of IPv6 need a taller slot than one line of IPv4, and the slot is
-     shared so that switching can't move the toggle. That leaves IPv4 with slack
-     to sit in, and centring it splits the slack in two — half of it landing
-     between the address and its toggle, which is the one gap on the page that
-     is supposed to be tight. Aligned to the bottom, the whole surplus goes
-     above the address instead, where it is indistinguishable from the
-     whitespace already there, and both versions end up the same distance from
-     the control that switches them. */
-  .ip-display { align-items: flex-end; }
-
   .ip-display[data-version="v6"] .ip-text {
     flex-wrap: wrap;
     row-gap: 0.08em;
@@ -470,17 +431,6 @@ button {
        push past the button that holds it. */
     max-width: calc(var(--adv6h, 9.4) * 1.015em);
   }
-}
-
-/* No IPv6 to show — a failed lookup, or a v4-only network. The v6 tab then
-   draws a short word at the v4 size (see render()), so every v6 term above is
-   describing something that isn't there: left alone, a narrow viewport would
-   reserve two lines of height for a seven-character word and push the toggle
-   down to clear a gap nothing occupies. Outranks the media query on
-   specificity, so it holds at every width without needing to repeat itself. */
-.hero[data-v6="none"] {
-  --fs6: var(--fs4);
-  --lines6: 1;
 }
 
 /* ---- meta line ---- */
@@ -553,6 +503,17 @@ button {
   transition-delay: calc(var(--affordance, 0) * 220ms);
 }
 
+/* The family label steps aside while the hint is up — same switch as the hint
+   itself, opposite direction, so "IPv4" and "click to copy" never print on
+   top of each other. Left alone during the copy flash and the value-swap
+   crossfade: those already own the row via [data-copied] / .is-swapping, and
+   this rule must not fight either one. */
+.meta:not([data-copied]):not(.is-swapping) .meta-text {
+  opacity: calc(1 - var(--affordance, 0));
+  transition: opacity 200ms var(--ease);
+  transition-delay: calc(var(--affordance, 0) * 220ms);
+}
+
 /* The slot is busy confirming a copy — and a hint on how to do the thing that
    was just done is the one moment it's noise. */
 .meta[data-copied] .copy-hint {
@@ -574,8 +535,8 @@ button {
      only way to find out is to tap it by accident. Held below full strength so
      it stays a caption rather than competing with the address above it.
      Gated on [data-copyable] for the same reason the hover version is: a dead
-     slot must not offer to copy, and `no IPv4` puts real text in this row that
-     the hint would otherwise sit on top of. Gated on :not([data-copied])
+     slot must not offer to copy, and a failed lookup puts real text in this
+     row that the hint would otherwise sit on top of. Gated on :not([data-copied])
      rather than left to the rule above, which this selector now outweighs:
      a hint on how to do the thing that was just done is the one moment it's
      noise, and it has to be gone while the row says "copied". */
@@ -584,111 +545,13 @@ button {
     translate: none;
     transition-delay: 0s;
   }
-}
 
-/* ---- version toggle ---- */
-/* Grid, not flex, and no gap: `1fr 1fr` makes both cells exactly half the
-   track, which is the assumption the sliding thumb below is built on. It also
-   means the pill can't jitter when the webfont swaps in and "IPv4"/"IPv6"
-   change width — the halves stay halves. */
-.toggle {
-  position: relative;
-  display: inline-grid;
-  grid-template-columns: repeat(2, 1fr);
-  /* Tight to the value it switches — the two are one unit, and --ip-pad
-     already contributes 4px of optical gap on top of this. */
-  margin-top: 12px;
-  padding: 2px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-}
-
-/* One pill that travels, instead of two that cross-fade — the eye tracks a
-   single object and the control reads as one mechanism.
-   Geometry: the containing block is the track's padding box (width W), so
-   `calc(50% - 2px)` == (W - 4px) / 2 == exactly one cell, and `translate: 100%`
-   moves it by its own width — landing perfectly on the second cell at any
-   track size, with no measuring in JS. */
-.toggle-thumb {
-  position: absolute;
-  z-index: 0;
-  top: 2px;
-  bottom: 2px;
-  left: 2px;
-  width: calc(50% - 2px);
-  border-radius: 999px;
-  background: var(--fg);
-  translate: 0;
-  /* Separate `translate`/`scale` properties, not `transform`, so the travel
-     and the press-squish can carry different durations without fighting over
-     one property. Expo is front-loaded: ~90% of the distance is covered in the
-     first 100ms, so it reads as instant but still lands softly. */
-  transition:
-    translate 340ms var(--ease-expo),
-    scale 200ms var(--ease-expo),
-    background-color 0.2s var(--ease);
-}
-
-.toggle[data-version="v6"] .toggle-thumb { translate: 100%; }
-
-/* Physical key feel: press anywhere on the track and the pill gives, then
-   springs back as it launches into the slide. */
-.toggle:active .toggle-thumb { scale: 0.93; }
-
-.toggle-btn {
-  position: relative; /* above the thumb */
-  z-index: 1;
-  appearance: none;
-  border: none;
-  background: none;
-  cursor: pointer;
-  padding: 5px 14px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0.1em;
-  color: var(--fg-muted);
-  /* Roughly half the slide: the label has to hand off its light-on-dark
-     colour at the moment the pill actually passes under it. Slower and the
-     incoming label flashes light-on-light; faster and the outgoing one goes
-     muted while still sitting on the dark pill. */
-  transition: color 160ms var(--ease);
-}
-
-/* Gated, because a touch browser leaves :hover stuck on the last thing tapped
-   — so switching to IPv6 left IPv4 sitting in its hover colour indefinitely,
-   a highlight on the option you did not choose. */
-@media (hover: hover) and (pointer: fine) {
-  .toggle-btn:hover:not(.is-active) { color: var(--fg-secondary); }
-}
-
-.toggle-btn.is-active { color: var(--bg); }
-
-/* A finger is not a cursor. At the desktop size the track is 30px tall, which
-   is a comfortable click and a miss-prone tap — below the ~44px both platform
-   guidelines ask for. The padding grows rather than the type, so the control
-   keeps its proportions and only its hit area changes; the label goes up one
-   pixel because 11px is a squint at arm's length. */
-@media (pointer: coarse) {
-  .toggle-btn {
-    padding: 12px 22px;
-    font-size: 12px;
+  /* No hover to step aside on, so the label is hidden outright rather than
+     faded — the coarse hint is permanently in the row, not a transient one. */
+  .hero:has(.ip-display[data-copyable]) .meta:not([data-copied]) .meta-text {
+    opacity: 0;
   }
 }
-
-/* Failed lookup: there's no second answer to switch to. Marked with
-   `aria-disabled` rather than `disabled` (see setToggleEnabled), so it keeps
-   its focus ring and its place in the tab order — which means it also has to
-   *look* unavailable, or it's a control that reads live and does nothing.
-   0.45 is the same dimming the value above uses; one opacity across the page
-   for "we don't have this". */
-.toggle.is-disabled { opacity: 0.45; }
-
-/* Every affordance that says "this responds to you" has to go with it: the
-   pointer, the hover lift, and the press-squish on the thumb. */
-.toggle.is-disabled .toggle-btn { cursor: default; }
-.toggle.is-disabled .toggle-btn:hover:not(.is-active) { color: var(--fg-muted); }
-.toggle.is-disabled:active .toggle-thumb { scale: 1; }
 
 /* ---- curl hint ---- */
 /* Fixed to the viewport so it costs the hero nothing. Sits at 0.45 opacity —
@@ -767,7 +630,7 @@ button {
   .curl { display: none; }
 }
 
-/* Nothing to anchor it to on a short viewport — it'd collide with the toggle. */
+/* Nothing to anchor it to on a short viewport — it'd collide with the address/meta block. */
 @media (max-height: 380px) {
   .curl { display: none; }
 }
@@ -776,8 +639,7 @@ button {
 /* Gentler, not zero: the colour swap carries the meaning, so it stays.
    Only the movement goes. */
 @media (prefers-reduced-motion: reduce) {
-  .ip-display,
-  .toggle-btn {
+  .ip-display {
     transition-duration: 0.01ms;
   }
   .ip-display[data-copyable]:active { transform: none; }
@@ -802,21 +664,12 @@ button {
     transition-delay: 0s;
   }
   /* The crossfade still carries "this value was replaced" — only the
-     movement and the defocus go. */
-  .ip-text,
+     movement goes. */
   .meta-text,
   .curl-label { transition-duration: var(--ip-exit); }
-  .ip-display.is-switching .ip-text {
-    transform: none;
-    filter: none;
-  }
   .meta.is-swapping .meta-text { transform: none; }
   .curl-btn.is-swapping .curl-label { transform: none; }
   .curl-btn:active .curl-label { scale: 1; }
-  /* The pill jumps to the new cell instead of travelling; it keeps the theme
-     crossfade, which is colour, not motion. */
-  .toggle-thumb { transition: background-color 0.2s var(--ease); }
-  .toggle:active .toggle-thumb { scale: 1; }
 }
 
 /* ---- utilities ---- */
