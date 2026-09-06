@@ -11,7 +11,10 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png" />
   <meta name="theme-color" content="#ebeff2" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#151619" media="(prefers-color-scheme: dark)" />
-  <link rel="stylesheet" href="css/style.css" />
+  <!-- Root-relative, unlike index.html's: 404.html is served at whatever path
+       the visitor got wrong, so a relative href would resolve against that
+       path and 404 in turn, leaving the page unstyled. -->
+  <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
   <main class="notfound">
