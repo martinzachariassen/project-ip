@@ -18,7 +18,7 @@
      fifth of the usable width at 320px. */
   --gutter: clamp(12px, 4vw, 32px);
 
-  /* Read back by script.js so the IP value and meta line exit in sync —
+  /* Read back by main.js so the IP value and meta line exit in sync —
      style.css stays the single source of truth for the timing. */
   --ip-exit: 110ms;
 

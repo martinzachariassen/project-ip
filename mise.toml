@@ -1,2 +1,5 @@
 [tools]
-bun = "latest"
+# Pinned, not "latest": CI, the deploy job, and this machine have to agree on
+# the version that resolved bun.lock, or `--frozen-lockfile` is enforcing a
+# lockfile a different Bun wrote.
+bun = "1.4.0"

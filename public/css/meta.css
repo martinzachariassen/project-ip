@@ -1,5 +1,5 @@
 /* ---- meta line ---- */
-/* Does double duty: geo/ISP context at rest, copy confirmation on demand —
+/* Does double duty: the copy shortcuts at rest, copy confirmation on demand —
    the only spare text slot on the page, so reusing it beats a toast.
    min-height reserves the row so neither job shifts the layout. */
 .meta {

@@ -13,7 +13,7 @@
 
 /* ---- hero ---- */
 /* Type is fitted to the address's actual width rather than a fixed vw ramp:
-   script.js measures how many ems wide the value is (--adv4/--adv6/--adv6h,
+   main.js measures how many ems wide the value is (--adv4/--adv6/--adv6h,
    see measureAdvances) and CSS divides the available width by that, so both
    a short IPv4 and a long IPv6 land at the largest size that fits. */
 .hero {
@@ -200,7 +200,7 @@
    which is a bug, not a layout. */
 @media (max-width: 480px) {
   .hero {
-    /* twoLineAdvance (script.js) picks the split that balances both lines.
+    /* twoLineAdvance (main.js) picks the split that balances both lines.
        The extra 2% absorbs subpixel rounding that would otherwise push the
        fourth group onto a third, ragged line. */
     --fs6: min(var(--cap6), calc(var(--ip-avail) / var(--adv6h, 9.4) / 1.02));
