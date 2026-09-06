@@ -1,0 +1,14 @@
+{
+  "name": "functions",
+  "private": true,
+  "description": "Cloud Function backing /ip on ip.mlz.no — echoes the caller's real address.",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "_comment": "firebase-admin is not imported by index.js, but it is a required (non-optional) peer of firebase-functions and gets installed either way — pinned here rather than left to peer resolution.",
+  "dependencies": {
+    "firebase-admin": "^13.5.0",
+    "firebase-functions": "^6.0.0"
+  }
+}

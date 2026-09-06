@@ -1,0 +1,30 @@
+name: Dependency Review
+
+# Blocks a PR that pulls in a dependency with a known vulnerability (or an
+# incompatible licence) *before* it lands — Dependabot only reacts after a
+# bad version is already on main.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dep-review-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: review dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5
+        with:
+          fail-on-severity: moderate
+          comment-summary-in-pr: on-failure

@@ -1,0 +1,109 @@
+{
+  // Hosting serves public/ as static files, as-is — no build step for the
+  // frontend. The one dynamic path is /ip, rewritten to a Cloud Function
+  // that echoes the caller's real address; everything else here is the
+  // security hardening and cache policy that a static site has nowhere
+  // else to declare.
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "cleanUrls": false,
+    "trailingSlash": false,
+    "rewrites": [
+      {
+        "source": "/ip",
+        "function": {
+          "functionId": "ip",
+          "region": "europe-west1"
+        }
+      }
+    ],
+    // Order matters — last match wins. The catch-all comes first and the
+    // path-specific overrides after it.
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Strict-Transport-Security",
+            "value": "max-age=31536000; includeSubDomains"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
+          },
+          {
+            "key": "X-Frame-Options",
+            "value": "DENY"
+          },
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "Permissions-Policy",
+            "value": "geolocation=(), microphone=(), camera=()"
+          },
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; img-src 'self'; font-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'; upgrade-insecure-requests"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=0, must-revalidate"
+          }
+        ]
+      },
+      // Fonts and icons keep stable URLs across deploys — nothing here is
+      // content-hashed (no build step) — so they get a day of caching
+      // rather than immutability.
+      {
+        "source": "**/*.@(png|svg|woff2|ico|webmanifest)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=86400"
+          }
+        ]
+      },
+      // /ip is per-visitor data — it must never be cached, by a browser or
+      // by Hosting's CDN.
+      {
+        "source": "/ip",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-store, private"
+          }
+        ]
+      }
+    ]
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log"
+      ]
+    }
+  ],
+  // Pinned ports rather than the CLI defaults, so CI has a fixed address to
+  // curl against.
+  "emulators": {
+    "hosting": {
+      "port": 5000
+    },
+    "functions": {
+      "port": 5001
+    },
+    "singleProjectMode": true
+  }
+}

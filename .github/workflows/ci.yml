@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Read-only: every dependency comes from the public npm registry.
+permissions:
+  contents: read
+
+# Newer pushes cancel in-flight runs.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # Bun version comes from mise.toml — single source of truth. Bun is
+      # the package manager for the site tooling; functions/ is plain npm
+      # (Cloud Functions' buildpack only recognizes npm/yarn lockfiles).
+      - name: Set up mise (installs Bun from mise.toml)
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint & format check
+        run: bun run lint
+
+      - name: Install function dependencies
+        working-directory: functions
+        run: npm ci
+
+      # Same script the deploy workflow gates on, and the same one you can
+      # run locally — see scripts/verify.sh.
+      - name: Check firebase.json headers, cache policy, and /ip
+        run: ./scripts/verify.sh

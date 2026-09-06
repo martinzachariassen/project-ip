@@ -1,0 +1,94 @@
+name: Deploy
+
+# Publishes public/ and the /ip Cloud Function to Firebase Hosting.
+#
+# Nothing ships that hasn't passed scripts/verify.sh first: the `verify` job
+# below boots the emulators and asserts the same production contract CI does
+# (headers, cache policy, /ip's formats, 405, the rate limit), and `deploy`
+# needs it. That gate covers workflow_dispatch too, which previously
+# deployed with no checks at all.
+#
+# Keyless auth: GitHub's OIDC token is exchanged via Workload Identity
+# Federation for short-lived credentials impersonating the deploy service
+# account, locked to this repo via an attribute condition. Nothing secret
+# lives here, so these are repo *variables*, not secrets:
+#   GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_SERVICE_ACCOUNT
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # Required for GitHub to mint the OIDC token that WIF exchanges.
+  id-token: write
+
+# Newest commit wins, but an in-flight run finishes rather than shipping
+# half-uploaded assets. Covers verify + deploy as one unit, so a superseded
+# commit can't be mid-verify while its successor deploys.
+concurrency:
+  group: deploy-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up mise (installs Bun from mise.toml)
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint & format check
+        run: bun run lint
+
+      - name: Install function dependencies
+        working-directory: functions
+        run: npm ci
+
+      - name: Check firebase.json headers, cache policy, and /ip
+        run: ./scripts/verify.sh
+
+  deploy:
+    name: deploy to Firebase Hosting + Functions
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://ip.mlz.no
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up mise (installs Bun from mise.toml)
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install function dependencies
+        working-directory: functions
+        run: npm ci
+
+      # Impersonation gives a plain OAuth token; firebase-tools has a history
+      # of failing on raw external_account files. GOOGLE_APPLICATION_CREDENTIALS
+      # is set for the step below (create_credentials_file defaults to true).
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: what-is-my-ip-f7210
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      # Uses the devDependency-pinned firebase-tools, same version CI tested — not a marketplace action's own resolution.
+      - name: Deploy
+        run: bunx firebase-tools deploy --only hosting,functions --project what-is-my-ip-f7210 --non-interactive
