@@ -34,8 +34,6 @@ const ipLabel = document.getElementById("ip-label");
 const metaEl = document.getElementById("meta");
 const metaText = document.getElementById("meta-text");
 const statusEl = document.getElementById("status");
-const curlBtn = document.getElementById("curl");
-const curlLabel = document.getElementById("curl-label");
 
 const state = { failed: false, copyable: false, meta: "" };
 
@@ -51,9 +49,7 @@ function dropPointerFocus(e) {
   if (e.detail > 0) e.currentTarget.blur();
 }
 
-[ipBtn, curlBtn].forEach((btn) => {
-  btn?.addEventListener("click", dropPointerFocus);
-});
+ipBtn.addEventListener("click", dropPointerFocus);
 
 let announceTimer;
 function announce(message) {
@@ -119,34 +115,6 @@ function copyCIDR() {
 }
 
 ipBtn.addEventListener("click", copyIP);
-
-const CURL_CMD = curlLabel?.textContent.trim() ?? "";
-
-let curlTimer;
-let curlToken = 0;
-
-async function swapCurlLabel(text) {
-  const token = ++curlToken;
-  curlBtn.classList.add("is-swapping");
-  await wait(EXIT_MS);
-  if (token !== curlToken) return;
-  curlLabel.textContent = text;
-  curlBtn.classList.remove("is-swapping");
-}
-
-curlBtn?.addEventListener("click", async () => {
-  clearTimeout(curlTimer);
-  curlBtn.dataset.copied = "";
-
-  const ok = await copyText(CURL_CMD);
-  swapCurlLabel(ok ? "copied" : "copy failed");
-  announce(ok ? "Command copied" : "Copy failed");
-
-  curlTimer = setTimeout(() => {
-    delete curlBtn.dataset.copied;
-    swapCurlLabel(CURL_CMD);
-  }, 1500);
-});
 
 const TIMING = {
   boot: {

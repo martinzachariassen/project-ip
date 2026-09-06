@@ -50,7 +50,7 @@
           },
           {
             "key": "Content-Security-Policy",
-            "value": "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; img-src 'self'; font-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'none'; upgrade-insecure-requests"
+            "value": "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; img-src 'self'; font-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'; upgrade-insecure-requests"
           },
           {
             "key": "Cache-Control",
@@ -62,7 +62,7 @@
       // content-hashed (no build step) — so they get a day of caching
       // rather than immutability.
       {
-        "source": "**/*.@(png|svg|woff2)",
+        "source": "**/*.@(png|svg|woff2|ico|webmanifest)",
         "headers": [
           {
             "key": "Cache-Control",

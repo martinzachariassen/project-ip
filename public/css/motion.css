@@ -24,17 +24,10 @@
     transition-duration: 60ms;
     transition-delay: 0s;
   }
-  .meta-text,
-  .curl-label {
+  .meta-text {
     transition-duration: var(--ip-exit);
   }
   .meta.is-swapping .meta-text {
     transform: none;
-  }
-  .curl-btn.is-swapping .curl-label {
-    transform: none;
-  }
-  .curl-btn:active .curl-label {
-    scale: 1;
   }
 }

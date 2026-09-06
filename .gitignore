@@ -35,3 +35,9 @@ Thumbs.db
 
 # Playwright MCP tool scratch output (console logs, page snapshots)
 .playwright-mcp/
+
+# The user's global gitignore has a case-insensitive "Icon?" rule (for macOS
+# custom folder icons) that also matches this directory name — un-ignore it
+# so the favicon assets it holds actually get tracked.
+!public/assets/icons/
+!public/assets/icons/**

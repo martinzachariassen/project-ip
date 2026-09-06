@@ -1,6 +1,6 @@
 # ip.mlz.no
 
-[![CI](https://github.com/martinzachariassen/project-ip/actions/workflows/ci.yml/badge.svg)](https://github.com/martinzachariassen/project-ip/actions/workflows/ci.yml)
+[![CI](https://github.com/martinzachariassen/what-is-my-ip/actions/workflows/ci.yml/badge.svg)](https://github.com/martinzachariassen/what-is-my-ip/actions/workflows/ci.yml)
 
 A minimal "what is my IP" site — live at [ip.mlz.no](https://ip.mlz.no).
 
@@ -12,8 +12,7 @@ real address.
 
 - No frontend build step — the files in `public/` are exactly what gets
   deployed
-- A scrambled-digit reveal animation, click/tap-to-copy, and a copyable curl
-  command
+- A scrambled-digit reveal animation and click/tap-to-copy
 - One dynamic endpoint, `/ip`, rewritten to a Cloud Function — everything
   else is static and CDN-cached
 - Security headers (CSP, HSTS, and friends) and cache policy defined in

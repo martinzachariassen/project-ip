@@ -3,13 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="format-detection" content="telephone=no" />
   <title>what is my ip · ip.mlz.no</title>
   <meta name="description" content="Your public IP address — clean and fast." />
-  <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml" />
-  <link rel="icon" href="assets/icons/favicon-32.png" sizes="32x32" type="image/png" />
-  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
+  <link rel="canonical" href="https://ip.mlz.no/" />
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/icons/favicon-192.png" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png" />
+  <link rel="manifest" href="/assets/site.webmanifest" />
   <meta name="theme-color" content="#ebeff2" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#151619" media="(prefers-color-scheme: dark)" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="what is my ip" />
+  <meta property="og:url" content="https://ip.mlz.no/" />
+  <meta property="og:title" content="what is my ip" />
+  <meta property="og:description" content="Your public IP address — clean and fast." />
+  <meta property="og:locale" content="en_GB" />
+  <meta name="twitter:card" content="summary" />
+
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/rajdhani-700.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/ibm-plex-mono-400.woff2" crossorigin />
   <link rel="stylesheet" href="css/style.css" />
@@ -30,12 +45,6 @@
 
     <p id="status" class="sr-only" role="status" aria-atomic="true"></p>
   </main>
-
-  <footer class="curl">
-    <button id="curl" class="curl-btn" type="button" title="Copy the command">
-      <span id="curl-label" class="curl-label">curl ip.mlz.no/ip</span>
-    </button>
-  </footer>
 
   <noscript>
     <p class="meta">JavaScript is required to look up your IP address.</p>
