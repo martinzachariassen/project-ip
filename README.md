@@ -54,14 +54,50 @@ The one exception is `/ip`, rewritten by Hosting to a Cloud Function
 off `X-Forwarded-For` and responds with plain text by default — so
 `curl ip.mlz.no/ip` returns a bare address — or JSON when asked
 (`Accept: application/json`), which is what the page's own script uses to
-render the animation. Its response is always `Cache-Control: no-store` —
-nothing here is per-visitor data worth caching, or worth restricting ingress
-over, since the address is only ever displayed back to the caller.
+render the animation. Its response is always `Cache-Control: no-store`:
+the answer is per-visitor by definition, so there is nothing a cache could
+usefully hold.
+
+Because `no-store` means every hit reaches the function rather than
+Hosting's CDN, `/ip` is the one part of the site with a per-request cost,
+and the abuse story is a cost story rather than a data one — the address is
+only ever handed back to the caller who owns it. Three things bound it, in
+`functions/index.js`:
+
+- **`maxInstances: 3`** with **`concurrency: 250`** — the hard ceiling. The
+  handler is a header read, so throughput is bought with concurrency (free,
+  per-instance) instead of instances (billed). This is the limit that
+  actually holds, and it is pinned in code so a redeploy can't drift off it.
+- **`timeoutSeconds: 10`** — down from the platform's 60. Short timeouts are
+  what stop a slow-reader flood from parking instances.
+- **A per-instance rate limit**, 20 requests per minute per address, in
+  memory: no Redis, no Firestore, no extra bill. Its ceiling is really
+  20 × live instances, and on the raw Cloud Run URL the key is spoofable —
+  it's a speed bump, and `maxInstances` is the wall behind it.
+
+20/min is deliberately close to the bone: a page load costs exactly one
+request (every other asset is static and CDN-served), so even someone
+leaning on refresh doesn't approach it. What stops it going lower isn't the
+individual user but carrier-grade NAT — a mobile network can put many
+subscribers behind one IPv4, and they share a bucket.
+
+Under the emulator the limiter skips loopback, so local dev and CI's
+readiness polling don't throttle themselves. The exemption is gated on
+`FUNCTIONS_EMULATOR`, so production has no loopback hole; CI proves the real
+limit by flooding under a spoofed `X-Forwarded-For` instead.
+
+Ingress stays `ALLOW_ALL`: `ALLOW_INTERNAL_AND_GCLB` would block the
+`cloudfunctions.net` URL that Hosting's own rewrite goes through. The raw
+Cloud Run URL is therefore reachable directly, and a request that arrives
+that way can spoof `X-Forwarded-For` — which changes only what that caller
+is told about themselves. Through Hosting, Google's front end overwrites the
+header, so the address the page shows is the real one.
 
 CI (`.github/workflows/ci.yml`) boots the Hosting + Functions emulators and
 asserts that headers, cache rules, and `/ip` actually behave as configured —
 `firebase.json`'s `headers` list is last-match-wins, so a reorder could
-silently break a rule. Deploys (`.github/workflows/deploy.yml`) run on every
+silently break a rule. It also floods `/ip` under a spoofed address to prove
+the rate limit still answers 429 at its real production value. Deploys (`.github/workflows/deploy.yml`) run on every
 push to `main`, authenticating to Google Cloud via Workload Identity
 Federation — no long-lived secrets stored in the repo.
 

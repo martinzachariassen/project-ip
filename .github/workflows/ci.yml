@@ -65,9 +65,18 @@ jobs:
           # Functions emulator has finished parsing and registering the
           # function, so /ip can 404 with "does not exist" for a few
           # seconds after Hosting is already up.
-          for _ in $(seq 1 120); do
-            curl -s "$base/ip" | grep -qv "does not exist" && break
-            sleep 0.5
+          #
+          # `! ... | grep -q` and not `grep -qv`: -qv succeeds when *any*
+          # line fails to match, so a multi-line error page would have
+          # broken this loop on the first poll and let a not-yet-registered
+          # function through as "ready".
+          #
+          # Polling freely is safe because the function exempts loopback from
+          # its rate limit under the emulator; the flood test at the end
+          # spoofs an address precisely so it isn't sharing this budget.
+          for _ in $(seq 1 60); do
+            curl -s "$base/ip" | grep -q "does not exist" || break
+            sleep 1
           done
 
           fail=0
@@ -138,6 +147,48 @@ jobs:
             ok "/ip is not cached"
           else
             bad "/ip is missing no-store"
+          fi
+
+          # Same URL, two representations — an intermediary that ignored
+          # this would hand a curl user someone else's JSON.
+          if headers "$base/ip" | grep -qi '^vary:.*accept'; then
+            ok "/ip varies on Accept"
+          else
+            bad "/ip is missing Vary: Accept"
+          fi
+
+          # Nothing mutates, so anything but a read is a probe.
+          status="$(curl -s -o /dev/null -w '%{http_code}' -X POST "$base/ip")"
+          if [ "$status" = "405" ]; then
+            ok "/ip rejects POST"
+          else
+            bad "/ip accepted POST (status $status)"
+          fi
+
+          # Floods under a spoofed address (TEST-NET-3, RFC 5737) rather than
+          # the runner's own. The function exempts loopback in the emulator,
+          # so every check above ran unlimited and this one still measures the
+          # real production limit — no relaxed-for-CI value to drift from.
+          seen429=0
+          for _ in $(seq 1 60); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' \
+              -H 'X-Forwarded-For: 203.0.113.9' "$base/ip")"
+            if [ "$code" = "429" ]; then seen429=1; break; fi
+          done
+          if [ "$seen429" = "1" ]; then
+            ok "/ip rate limits a flood from one address"
+          else
+            bad "/ip served 60 rapid requests from one address without limiting"
+          fi
+
+          # The exemption is emulator-only and keyed on loopback, so a request
+          # that names any other address must still be counted — otherwise the
+          # limiter is off in production and this suite would never notice.
+          if [ "$(curl -s -o /dev/null -w '%{http_code}' \
+                -H 'X-Forwarded-For: 203.0.113.9' "$base/ip")" = "429" ]; then
+            ok "a limited address stays limited"
+          else
+            bad "a flooded address was served again immediately"
           fi
 
           if [ "$fail" -ne 0 ]; then
